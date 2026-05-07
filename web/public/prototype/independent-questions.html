@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>獨立題目列表</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root {
+      --page-bg: #f7f8fb;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #d9dee8;
+      --panel: #ffffff;
+      --accent: #0f6b5f;
+      --accent-soft: #e8f4f1;
+      --warning-soft: #fff7e6;
+    }
+
+    body {
+      background: var(--page-bg);
+      color: var(--ink);
+      letter-spacing: 0;
+    }
+
+    .app-shell {
+      max-width: 1180px;
+    }
+
+    .page-title {
+      font-size: clamp(1.45rem, 2vw, 2rem);
+      font-weight: 700;
+    }
+
+    .section-panel,
+    .question-item {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .question-number {
+      width: 3.25rem;
+      min-width: 3.25rem;
+      min-height: 3.25rem;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 800;
+      overflow-wrap: anywhere;
+      text-align: center;
+    }
+
+    .hint-text {
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .badge-table {
+      background: var(--warning-soft);
+      color: #7a4b00;
+      border: 1px solid #f7d48b;
+    }
+
+    .question-image {
+      display: block;
+      max-width: 100%;
+      max-height: 260px;
+      object-fit: contain;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .subquestion-list {
+      border-left: 3px solid #c8d7f0;
+      padding-left: 1rem;
+    }
+
+    .choice-list {
+      margin: 0;
+      padding-left: 0;
+      list-style: none;
+    }
+
+    .choice-list li {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: .65rem .75rem;
+      background: #fbfcff;
+    }
+  </style>
+</head>
+<body>
+  <main class="container-fluid app-shell py-4 py-lg-5">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+      <div>
+        <a class="btn btn-outline-secondary btn-sm mb-3" href="/prototype/exams-list.html">回考試列表</a>
+        <h1 class="page-title mb-2">獨立題目列表</h1>
+        <div class="text-secondary">只顯示 questions.exam_id IS NULL 的題目。</div>
+      </div>
+      <div class="d-flex flex-wrap gap-2 align-items-start">
+        <a class="btn btn-primary btn-sm" href="/prototype/independent-question-create.html">新增獨立題目</a>
+        <span class="badge rounded-pill badge-table px-3 py-2">questions</span>
+        <span class="badge rounded-pill badge-table px-3 py-2">exam_id NULL</span>
+      </div>
+    </div>
+
+    <section class="section-panel p-3 p-md-4">
+      <div class="d-flex justify-content-between gap-3 mb-3">
+        <h2 class="h6 fw-bold mb-0">題目</h2>
+        <span class="hint-text" id="questionCount"></span>
+      </div>
+      <div id="questionList" class="vstack gap-3"></div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/prototype/staged-status.js"></script>
+  <script>
+    const questionList = document.querySelector('#questionList');
+    const questionCount = document.querySelector('#questionCount');
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;')
+        .replaceAll('\n', '<br>');
+    }
+
+    function attachmentUrl(attachment) {
+      if (!attachment) return '';
+      return attachment.url || `/${attachment.path}`;
+    }
+
+    function renderChoices(record, className = 'mt-3') {
+      if (!record) return '';
+      const items = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+        .filter((letter) => record[letter])
+        .map((letter) => `<li><strong>${letter}.</strong> ${escapeHtml(record[letter])}</li>`)
+        .join('');
+      return items ? `<ol class="choice-list vstack gap-2 ${className}">${items}</ol>` : '';
+    }
+
+    function renderAttachments(attachments) {
+      return (attachments || []).map((attachment) => `
+        <img class="question-image mt-3" src="${attachmentUrl(attachment)}" alt="${escapeHtml(attachment.original_filename)}">
+      `).join('');
+    }
+
+    function renderAnswerButton(question) {
+      if (question.answer) {
+        return `<a class="btn btn-outline-success btn-sm" href="/prototype/edit-answer.html?question_id=${question.id}">編輯解答</a>`;
+      }
+      return `<a class="btn btn-outline-primary btn-sm" href="/prototype/answers.html?question_id=${question.id}">新增解答</a>`;
+    }
+
+    function renderQuestion(question) {
+      const displayNumber = question.question_number || `#${question.id}`;
+      return `
+        <article class="question-item p-3 p-md-4">
+          <div class="d-flex flex-column flex-md-row gap-3">
+            <a class="question-number text-decoration-none" href="/prototype/question.html?id=${question.id}" aria-label="查看題目 ${escapeHtml(displayNumber)}">${escapeHtml(displayNumber)}</a>
+            <div class="flex-grow-1">
+              <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 mb-2">
+                <div class="hint-text">questions.id = ${question.id} | ${escapeHtml(question.question_type || '未分類')} | ${question.score ?? ''} 分</div>
+                <div class="d-flex flex-wrap gap-2">
+                  <a class="btn btn-outline-dark btn-sm" href="/prototype/question.html?id=${question.id}">查看題目</a>
+                  <a class="btn btn-outline-secondary btn-sm" href="/prototype/edit-question.html?id=${question.id}">編輯題目</a>
+                  ${renderAnswerButton(question)}
+                </div>
+              </div>
+              <div>${question.question_text ? escapeHtml(question.question_text) : '<span class="text-secondary">尚未輸入題目文字</span>'}</div>
+              ${renderAttachments(question.attachments)}
+              ${renderChoices(question.choices)}
+              ${question.subquestions.length > 0 ? `
+                <div class="subquestion-list vstack gap-3 mt-3">
+                  ${question.subquestions.map((sub) => `
+                    <section>
+                      <div class="fw-bold">${escapeHtml(sub.subquestion_number)}</div>
+                      <div>${sub.subquestion_text ? escapeHtml(sub.subquestion_text) : '<span class="text-secondary">尚未輸入子題文字</span>'}</div>
+                      ${renderAttachments(sub.attachments)}
+                      ${renderChoices(sub.subchoices, 'mt-2')}
+                      <div class="hint-text mt-1">subquestions.id = ${sub.id} | ${escapeHtml(sub.question_type || '未分類')} | ${sub.score ?? ''} 分</div>
+                    </section>
+                  `).join('')}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    async function loadQuestions() {
+      const status = createStagedStatus({
+        setMessage: (stage) => {
+          const className = stage.type === 'warning' ? 'alert alert-warning mb-0' : 'text-secondary border rounded-3 p-3 bg-light';
+          questionList.innerHTML = `<div class="${className}">${escapeHtml(stage.message)}</div>`;
+        },
+        stages: loadingStages('獨立題目資料')
+      });
+      status.start();
+
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+
+      try {
+        const response = await fetch('/api/questions?scope=standalone', {
+          cache: 'no-store',
+          signal: controller.signal
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || '載入失敗');
+
+        const { questions } = result.data;
+        questionCount.textContent = `${questions.length} 題`;
+        questionList.innerHTML = questions.length > 0
+          ? questions.map(renderQuestion).join('')
+          : '<div class="text-secondary border rounded-3 p-3 bg-light">目前沒有獨立題目。</div>';
+
+        if (window.MathJax?.typesetPromise) await MathJax.typesetPromise([questionList]);
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          questionList.innerHTML = '<div class="alert alert-warning mb-0">載入逾時，請稍後再試。</div>';
+        } else {
+          questionList.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(error.message || '無法載入獨立題目')}</div>`;
+        }
+      } finally {
+        status.stop();
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    loadQuestions();
+  </script>
+</body>
+</html>

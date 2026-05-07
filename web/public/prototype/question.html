@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>查看題目資料</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root {
+      --page-bg: #f7f8fb;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #d9dee8;
+      --panel: #ffffff;
+      --accent: #0f6b5f;
+      --accent-soft: #e8f4f1;
+      --answer-soft: #fff7e6;
+    }
+
+    body {
+      background: var(--page-bg);
+      color: var(--ink);
+      letter-spacing: 0;
+    }
+
+    .app-shell {
+      max-width: 1180px;
+    }
+
+    .page-title {
+      font-size: clamp(1.45rem, 2vw, 2rem);
+      font-weight: 700;
+    }
+
+    .section-panel,
+    .subquestion-item {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .question-number {
+      width: 3.25rem;
+      min-width: 3.25rem;
+      min-height: 3.25rem;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 800;
+      overflow-wrap: anywhere;
+      text-align: center;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .hint-text,
+    .meta-text {
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .content-text {
+      overflow-wrap: anywhere;
+      line-height: 1.75;
+    }
+
+    .question-image,
+    .answer-image {
+      display: block;
+      max-width: 100%;
+      max-height: 360px;
+      object-fit: contain;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .choice-list {
+      margin: 0;
+      padding-left: 0;
+      list-style: none;
+    }
+
+    .choice-list li {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: .65rem .75rem;
+      background: #fbfcff;
+    }
+
+    .answer-panel {
+      background: #fffdf7;
+      border-color: #f3d89b;
+    }
+
+    .answer-label {
+      background: var(--answer-soft);
+      color: #7a4b00;
+      border: 1px solid #f7d48b;
+    }
+  </style>
+</head>
+<body>
+  <main class="container-fluid app-shell py-4 py-lg-5">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+      <div>
+        <button class="btn btn-outline-secondary btn-sm mb-3" id="backBtn" type="button">回上頁</button>
+        <h1 class="page-title mb-2" id="pageTitle">查看題目資料</h1>
+        <div class="text-secondary" id="pageMeta">正在載入...</div>
+      </div>
+      <div class="d-flex flex-wrap gap-2 align-items-start">
+        <a class="btn btn-outline-secondary btn-sm" id="editQuestionLink" href="#">編輯題目</a>
+        <a class="btn btn-outline-primary btn-sm" id="answerActionLink" href="#">新增解答</a>
+      </div>
+    </div>
+
+    <div id="statusBox"></div>
+    <div id="content" class="vstack gap-4"></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/prototype/staged-status.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const questionId = Number(params.get('id') || params.get('question_id') || 0);
+    const statusBox = document.querySelector('#statusBox');
+    const content = document.querySelector('#content');
+    const editQuestionLink = document.querySelector('#editQuestionLink');
+    const answerActionLink = document.querySelector('#answerActionLink');
+
+    let loadedQuestion = null;
+    let loadedAnswer = null;
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;')
+        .replaceAll('\n', '<br>');
+    }
+
+    function attachmentUrl(attachment) {
+      if (!attachment) return '';
+      return attachment.url || `/${attachment.path}`;
+    }
+
+    function setStatus(type, message) {
+      statusBox.innerHTML = message ? `<div class="alert alert-${type} mb-4">${escapeHtml(message)}</div>` : '';
+    }
+
+    function metaParts(question) {
+      return [
+        question.question_type || null,
+        question.score !== null && question.score !== undefined ? `${question.score} 分` : null,
+        question.difficulty || null,
+        question.source || null
+      ].filter(Boolean).join(' | ');
+    }
+
+    function renderImages(attachments, className = 'question-image') {
+      return (attachments || []).map((attachment) => `
+        <img class="${className} mt-3" src="${attachmentUrl(attachment)}" alt="${escapeHtml(attachment.original_filename)}">
+      `).join('');
+    }
+
+    function renderChoices(record) {
+      if (!record) return '';
+      const items = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+        .filter((letter) => record[letter])
+        .map((letter) => `<li><strong>${letter}.</strong> ${escapeHtml(record[letter])}</li>`)
+        .join('');
+      return items ? `<ol class="choice-list vstack gap-2 mt-3">${items}</ol>` : '';
+    }
+
+    function renderSubquestions(subquestions) {
+      if (!subquestions?.length) return '';
+      return `
+        <section class="section-panel p-3 p-md-4">
+          <h2 class="section-title mb-3">子題</h2>
+          <div class="vstack gap-3">
+            ${subquestions.map((sub) => `
+              <article class="subquestion-item p-3">
+                <div class="d-flex flex-column flex-sm-row justify-content-between gap-2 mb-2">
+                  <h3 class="h6 fw-bold mb-0">${escapeHtml(sub.subquestion_number)}</h3>
+                  <div class="meta-text">subquestions.id = ${sub.id} | ${escapeHtml(sub.question_type || '未選擇')} | ${sub.score ?? ''} 分</div>
+                </div>
+                <div class="content-text">${sub.subquestion_text ? escapeHtml(sub.subquestion_text) : '<span class="text-secondary">尚未輸入子題主文。</span>'}</div>
+                ${renderImages(sub.attachments)}
+                ${renderChoices(sub.subchoices)}
+              </article>
+            `).join('')}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderAnswer(answer) {
+      if (!answer) {
+        return `
+          <section class="section-panel answer-panel p-3 p-md-4">
+            <div class="d-flex flex-column flex-sm-row justify-content-between gap-2">
+              <div>
+                <h2 class="section-title mb-1">解答</h2>
+                <div class="text-secondary">這個題目目前還沒有建立解答。</div>
+              </div>
+              <a class="btn btn-outline-primary btn-sm align-self-sm-start" href="/prototype/answers.html?question_id=${questionId}">新增解答</a>
+            </div>
+          </section>
+        `;
+      }
+
+      return `
+        <section class="section-panel answer-panel p-3 p-md-4">
+          <div class="d-flex flex-column flex-sm-row justify-content-between gap-2 mb-3">
+            <div>
+              <h2 class="section-title mb-1">解答</h2>
+              <div class="meta-text">answers.id = ${answer.id}</div>
+            </div>
+            <span class="badge rounded-pill answer-label px-3 py-2 align-self-sm-start">answers</span>
+          </div>
+          ${answer.short_answer ? `<section class="mb-3"><div class="fw-bold mb-1">簡答</div><div class="content-text">${escapeHtml(answer.short_answer)}</div></section>` : ''}
+          ${renderImages(answer.attachments, 'answer-image')}
+          <section class="mt-3">
+            <div class="fw-bold mb-1">詳解</div>
+            <div class="content-text">${answer.answer_text ? escapeHtml(answer.answer_text) : '<span class="text-secondary">尚未輸入解答。</span>'}</div>
+          </section>
+          ${answer.source || answer.note ? `<div class="meta-text mt-3">${escapeHtml([answer.source, answer.note].filter(Boolean).join(' | '))}</div>` : ''}
+        </section>
+      `;
+    }
+
+    function renderPage() {
+      const question = loadedQuestion;
+      const answer = loadedAnswer;
+      document.querySelector('#pageTitle').textContent = question.question_number ? `題目 ${question.question_number}` : `題目 #${question.id}`;
+      document.querySelector('#pageMeta').textContent = `questions.id = ${question.id}${question.exam_id ? ` | exams.id = ${question.exam_id}` : ''}`;
+      editQuestionLink.href = `/prototype/edit-question.html?id=${question.id}`;
+      answerActionLink.href = answer
+        ? `/prototype/edit-answer.html?question_id=${question.id}`
+        : `/prototype/answers.html?question_id=${question.id}`;
+      answerActionLink.textContent = answer ? '編輯解答' : '新增解答';
+      answerActionLink.className = answer ? 'btn btn-outline-success btn-sm' : 'btn btn-outline-primary btn-sm';
+
+      content.innerHTML = `
+        <section class="section-panel p-3 p-md-4">
+          <div class="d-flex flex-column flex-md-row gap-3">
+            <div class="question-number">${escapeHtml(question.question_number || `#${question.id}`)}</div>
+            <div class="flex-grow-1">
+              <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 mb-2">
+                <h2 class="section-title mb-0">主題目</h2>
+                <div class="meta-text">${escapeHtml(metaParts(question))}</div>
+              </div>
+              <div class="content-text">${question.question_text ? escapeHtml(question.question_text) : '<span class="text-secondary">尚未輸入題目主文。</span>'}</div>
+              ${renderImages(question.attachments)}
+              ${renderChoices(question.choices)}
+              ${question.note ? `<div class="meta-text mt-3">備註：${escapeHtml(question.note)}</div>` : ''}
+            </div>
+          </div>
+        </section>
+        ${renderSubquestions(question.subquestions)}
+        ${renderAnswer(answer)}
+      `;
+
+      if (window.MathJax?.typesetPromise) MathJax.typesetPromise([content]);
+    }
+
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 120000) {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, { ...options, signal: controller.signal, cache: 'no-store' });
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    async function loadQuestionPage() {
+      if (!questionId) {
+        setStatus('danger', '網址缺少題目 id。');
+        return;
+      }
+
+      const status = createStagedStatus({
+        setMessage: (stage) => setStatus(stage.type, stage.message),
+        stages: loadingStages('題目資料')
+      });
+      status.start();
+
+      try {
+        const questionResponse = await fetchWithTimeout(`/api/admin/questions/${questionId}`);
+        const questionResult = await questionResponse.json();
+        if (!questionResponse.ok || !questionResult.success) throw new Error(questionResult.message || '載入題目失敗。');
+        loadedQuestion = questionResult.data.question;
+
+        const answerResponse = await fetchWithTimeout(`/api/admin/questions/${questionId}/answer`);
+        const answerResult = await answerResponse.json();
+        loadedAnswer = answerResponse.status === 404 ? null : answerResult.data?.answer || null;
+        if (!answerResponse.ok && answerResponse.status !== 404) throw new Error(answerResult.message || '載入解答失敗。');
+
+        setStatus('', '');
+        renderPage();
+      } catch (error) {
+        const message = error.name === 'AbortError'
+          ? '載入逾時，請確認資料庫連線後再試一次。'
+          : (error.message || '載入題目資料失敗。');
+        setStatus('danger', message);
+      } finally {
+        status.stop();
+      }
+    }
+
+    document.querySelector('#backBtn').addEventListener('click', () => {
+      if (loadedQuestion?.exam_id) {
+        window.location.href = `/prototype/exam-questions.html?exam_id=${loadedQuestion.exam_id}`;
+      } else if (loadedQuestion) {
+        window.location.href = '/prototype/independent-questions.html';
+      } else if (document.referrer) {
+        history.back();
+      } else {
+        window.location.href = '/prototype/exams-list.html';
+      }
+    });
+
+    loadQuestionPage();
+  </script>
+</body>
+</html>

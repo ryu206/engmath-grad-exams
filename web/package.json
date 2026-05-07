@@ -1,0 +1,24 @@
+{
+    "name": "engmath-grad-exams",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": ">=24.15.0",
+        "npm": ">=11.12.1"
+    },
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "next lint",
+        "node:version": "node -v",
+        "npm:version": "npm -v"
+    },
+    "dependencies": {
+        "mysql2": "^3.22.3",
+        "next": "16.2.4",
+        "react": "19.2.5",
+        "react-dom": "19.2.5"
+    }
+}

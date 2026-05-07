@@ -1,32 +1,62 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
+/node_modules/
+web/node_modules/
 /.pnp
 .pnp.js
 
 # testing
-/coverage
+coverage/
+/coverage/
 
 # next.js
+.next/
 /.next/
+web/.next/
 /out/
+out/
 
 # production
-/build
+/build/
+build/
+dist/
+
+# uploads and generated local files
+web/public/uploads/**
+!web/public/uploads/
+!web/public/uploads/.gitkeep
+web/public/assets/generated/
+
+# local database and backups
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.bak
+*.sql.gz
 
 # misc
 .DS_Store
+Thumbs.db
 *.pem
+*.key
+*.crt
 
 # debug
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # local env files
-.env*.local
 .env
+.env.*
+!.env.example
+!web/.env.example
+.env*.local
 
 # vercel
 .vercel

@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>新增考試資料</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --page-bg: #f7f8fb;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #d9dee8;
+      --panel: #ffffff;
+      --warning-soft: #fff7e6;
+    }
+
+    body {
+      background: var(--page-bg);
+      color: var(--ink);
+      letter-spacing: 0;
+    }
+
+    .app-shell {
+      max-width: 1120px;
+    }
+
+    .page-title {
+      font-size: clamp(1.45rem, 2vw, 2rem);
+      font-weight: 700;
+    }
+
+    .section-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .form-label {
+      font-weight: 600;
+      color: #344054;
+    }
+
+    .required-mark {
+      color: #b42318;
+    }
+
+    .preview-area {
+      min-height: 12rem;
+      background: #fbfcff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow-wrap: anywhere;
+    }
+
+    .payload-box {
+      min-height: 12rem;
+      max-height: 26rem;
+      overflow: auto;
+      background: #111827;
+      color: #d1e7dd;
+      border-radius: 8px;
+      font-size: .85rem;
+      white-space: pre-wrap;
+    }
+
+    .badge-table {
+      background: var(--warning-soft);
+      color: #7a4b00;
+      border: 1px solid #f7d48b;
+    }
+
+    .hint-text {
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .submit-status {
+      min-height: 2.75rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="container-fluid app-shell py-4 py-lg-5">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+      <div>
+        <button class="btn btn-outline-secondary btn-sm mb-3" type="button" id="backBtn">返回</button>
+        <h1 class="page-title mb-2">新增考試資料</h1>
+        <div class="text-secondary">建立 exams 資料，供題目輸入頁選擇來源。</div>
+      </div>
+      <div class="d-flex align-items-start gap-2">
+        <span class="badge rounded-pill badge-table px-3 py-2">exams</span>
+      </div>
+    </div>
+
+    <form id="examForm" class="row g-4" novalidate>
+      <div class="col-12 col-lg-7">
+        <section class="section-panel p-3 p-md-4 mb-4">
+          <h2 class="section-title mb-3">考試資料</h2>
+
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <label for="sourceKind" class="form-label">來源類型 <span class="required-mark">*</span></label>
+              <select class="form-select" id="sourceKind" required>
+                <option value="graduate_exam" selected>研究所考試</option>
+                <option value="others">其他</option>
+              </select>
+            </div>
+
+            <div class="col-12 d-none" id="otherTitleBox">
+              <label for="examTitleInput" class="form-label">來源名稱 <span class="required-mark">*</span></label>
+              <input type="text" class="form-control" id="examTitleInput" maxlength="255" placeholder="例：113年公職人員考試、XXX老師練習題">
+            </div>
+
+            <div class="col-12 col-md-4 graduate-field">
+              <label for="rocYear" class="form-label">年份 <span class="required-mark">*</span></label>
+              <input type="number" class="form-control" id="rocYear" name="roc_year" min="1" step="1" placeholder="例：113" required>
+              <div class="form-text">使用民國年。</div>
+            </div>
+
+            <div class="col-12 col-md-8 graduate-field">
+              <label for="university" class="form-label">大學 <span class="required-mark">*</span></label>
+              <input type="text" class="form-control" id="university" name="university" placeholder="例：國立臺灣大學" required>
+            </div>
+
+            <div class="col-12 col-md-6 graduate-field">
+              <label for="department" class="form-label">系所</label>
+              <input type="text" class="form-control" id="department" name="department" placeholder="例：電機工程學系">
+            </div>
+
+            <div class="col-12 col-md-6 graduate-field">
+              <label for="division" class="form-label">組別</label>
+              <input type="text" class="form-control" id="division" name="division" placeholder="例：甲組、控制組">
+            </div>
+
+            <div class="col-12 col-md-6 graduate-field">
+              <label for="subjectPreset" class="form-label">科目</label>
+              <select class="form-select" id="subjectPreset">
+                <option value="">請選擇</option>
+                <option value="工程數學">工程數學</option>
+                <option value="應用數學">應用數學</option>
+                <option value="線性代數">線性代數</option>
+                <option value="custom">自訂輸入</option>
+              </select>
+            </div>
+
+            <div class="col-12 col-md-6 d-none graduate-field" id="customSubjectBox">
+              <label for="customSubject" class="form-label">自訂科目</label>
+              <input type="text" class="form-control" id="customSubject" placeholder="例：高等工程數學">
+            </div>
+
+            <div class="col-12 col-md-6 graduate-field">
+              <label for="paper" class="form-label">卷別</label>
+              <input type="text" class="form-control" id="paper" name="paper" placeholder="例：A 卷、第一卷">
+            </div>
+          </div>
+        </section>
+
+        <section class="section-panel p-3 p-md-4">
+          <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+            <h2 class="section-title mb-0">送出資料預覽</h2>
+            <button class="btn btn-primary" type="submit">送出</button>
+          </div>
+          <div id="submitStatus" class="submit-status mb-3"></div>
+          <pre id="payloadPreview" class="payload-box p-3 mb-0"></pre>
+        </section>
+      </div>
+
+      <aside class="col-12 col-lg-5">
+        <section class="section-panel p-3 p-md-4">
+          <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+            <h2 class="section-title mb-0">名稱預覽</h2>
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="refreshPreviewBtn">重新預覽</button>
+          </div>
+          <div class="preview-area p-3 p-md-4">
+            <article id="examPreview"></article>
+          </div>
+        </section>
+      </aside>
+    </form>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const form = document.querySelector('#examForm');
+    const sourceKind = document.querySelector('#sourceKind');
+    const otherTitleBox = document.querySelector('#otherTitleBox');
+    const examTitleInput = document.querySelector('#examTitleInput');
+    const subjectPreset = document.querySelector('#subjectPreset');
+    const customSubjectBox = document.querySelector('#customSubjectBox');
+    const customSubject = document.querySelector('#customSubject');
+    const payloadPreview = document.querySelector('#payloadPreview');
+    const examPreview = document.querySelector('#examPreview');
+    const submitStatus = document.querySelector('#submitStatus');
+    const graduateRequired = ['#rocYear', '#university'];
+
+    function utcNow() {
+      return new Date().toISOString();
+    }
+
+    function value(selector) {
+      return document.querySelector(selector).value.trim();
+    }
+
+    function numberOrNull(raw) {
+      const trimmed = String(raw).trim();
+      return trimmed === '' ? null : Number(trimmed);
+    }
+
+    function subjectValue() {
+      return subjectPreset.value === 'custom' ? customSubject.value.trim() : subjectPreset.value;
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;')
+        .replaceAll('\n', '<br>');
+    }
+
+    function graduateTitle() {
+      return [
+        value('#rocYear'),
+        value('#university'),
+        value('#department'),
+        value('#division'),
+        subjectValue(),
+        value('#paper')
+      ].filter(Boolean).join('');
+    }
+
+    function currentTitle() {
+      return sourceKind.value === 'graduate_exam' ? graduateTitle() : examTitleInput.value.trim();
+    }
+
+    function buildPayload() {
+      const utc = utcNow();
+      const isGraduate = sourceKind.value === 'graduate_exam';
+      return {
+        exams: {
+          id: null,
+          source_kind: sourceKind.value,
+          title: isGraduate ? null : examTitleInput.value.trim(),
+          roc_year: isGraduate ? numberOrNull(value('#rocYear')) : null,
+          university: isGraduate ? value('#university') : null,
+          department: isGraduate ? value('#department') || null : null,
+          division: isGraduate ? value('#division') || null : null,
+          subject: isGraduate ? subjectValue() || null : null,
+          paper: isGraduate ? value('#paper') || null : null,
+          created_at: utc,
+          updated_at: utc,
+          deleted_at: null
+        }
+      };
+    }
+
+    function refreshPreview() {
+      const title = currentTitle();
+      const note = sourceKind.value === 'graduate_exam'
+        ? '研究所考試的 title 由後端依年份、大學、系所、組別、科目、卷別產生。'
+        : '其他來源的 title 由使用者輸入。';
+
+      examPreview.innerHTML = title
+        ? `<h3 class="h5 mb-3">${escapeHtml(title)}</h3><div class="hint-text">${escapeHtml(note)}</div>`
+        : '<span class="text-secondary">請輸入必要欄位後預覽名稱。</span>';
+    }
+
+    function refreshPayload() {
+      payloadPreview.textContent = JSON.stringify(buildPayload(), null, 2);
+    }
+
+    function refreshSections() {
+      const isGraduate = sourceKind.value === 'graduate_exam';
+      document.querySelectorAll('.graduate-field').forEach((field) => {
+        field.classList.toggle('d-none', !isGraduate);
+      });
+      otherTitleBox.classList.toggle('d-none', isGraduate);
+      examTitleInput.required = !isGraduate;
+      graduateRequired.forEach((selector) => {
+        document.querySelector(selector).required = isGraduate;
+      });
+      const isCustom = isGraduate && subjectPreset.value === 'custom';
+      customSubjectBox.classList.toggle('d-none', !isCustom);
+    }
+
+    function refreshAll() {
+      refreshSections();
+      refreshPayload();
+      refreshPreview();
+    }
+
+    function setSubmitStatus(type, message) {
+      submitStatus.innerHTML = message
+        ? `<div class="alert alert-${type} py-2 px-3 mb-0">${escapeHtml(message)}</div>`
+        : '';
+    }
+
+    async function submitExam() {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+
+      try {
+        setSubmitStatus('info', '正在送出資料...');
+
+        const response = await fetch('/api/admin/exams', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(buildPayload()),
+          signal: controller.signal
+        });
+
+        const result = await response.json().catch(() => null);
+
+        if (!response.ok || !result?.success) {
+          const message = result?.message || '新增失敗，請檢查欄位。';
+          setSubmitStatus('danger', message);
+          return;
+        }
+
+        setSubmitStatus('success', '新增成功，正在前往考試列表...');
+        window.setTimeout(() => {
+          window.location.href = result.data?.redirect_to || '/prototype/exams-list.html';
+        }, 600);
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          setSubmitStatus('warning', '請求逾時，請確認資料庫連線後再試一次。');
+          return;
+        }
+
+        setSubmitStatus('danger', '無法呼叫新增 API，請確認 Next.js 伺服器正在執行。');
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    form.addEventListener('input', refreshAll);
+    form.addEventListener('change', refreshAll);
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      form.classList.add('was-validated');
+      refreshAll();
+      if (form.checkValidity()) {
+        await submitExam();
+      }
+    });
+    document.querySelector('#refreshPreviewBtn').addEventListener('click', refreshPreview);
+    document.querySelector('#backBtn').addEventListener('click', () => {
+      if (document.referrer) {
+        history.back();
+      } else {
+        window.location.href = 'exams-list.html';
+      }
+    });
+
+    refreshAll();
+  </script>
+</body>
+</html>

@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>新增工程數學題目</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root {
+      --page-bg: #f7f8fb;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #d9dee8;
+      --panel: #ffffff;
+      --accent: #0f6b5f;
+      --accent-soft: #e8f4f1;
+      --warning-soft: #fff7e6;
+    }
+
+    body {
+      background: var(--page-bg);
+      color: var(--ink);
+      letter-spacing: 0;
+    }
+
+    .app-shell {
+      max-width: 1320px;
+    }
+
+    .page-title {
+      font-size: clamp(1.45rem, 2vw, 2rem);
+      font-weight: 700;
+    }
+
+    .section-panel,
+    .subquestion-item {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .form-label {
+      font-weight: 600;
+      color: #344054;
+    }
+
+    .required-mark {
+      color: #b42318;
+    }
+
+    .hint-text,
+    .preview-meta {
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .choice-letter {
+      width: 2.75rem;
+      min-width: 2.75rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: var(--accent-soft);
+      border: 1px solid #badbd4;
+      border-radius: 6px;
+    }
+
+    .preview-area {
+      min-height: 18rem;
+      max-height: 72vh;
+      background: #fbfcff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: auto;
+      overflow-wrap: anywhere;
+      scrollbar-gutter: stable;
+    }
+
+    .preview-resizer {
+      width: min(11rem, 34vw);
+    }
+
+    .question-image-preview {
+      display: block;
+      max-width: 100%;
+      max-height: 320px;
+      object-fit: contain;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .payload-box {
+      min-height: 14rem;
+      max-height: 28rem;
+      overflow: auto;
+      background: #111827;
+      color: #d1e7dd;
+      border-radius: 8px;
+      font-size: .85rem;
+      white-space: pre-wrap;
+    }
+
+    .sticky-preview {
+      top: 1rem;
+    }
+
+    .badge-table {
+      background: var(--warning-soft);
+      color: #7a4b00;
+      border: 1px solid #f7d48b;
+    }
+
+    .submit-status {
+      min-height: 2.75rem;
+    }
+
+    .locked-field {
+      background: #e9ecef;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 991.98px) {
+      .sticky-preview {
+        position: static !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="container-fluid app-shell py-4 py-lg-5">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+      <div>
+        <button class="btn btn-outline-secondary btn-sm mb-3" type="button" id="backBtn">回上頁</button>
+        <h1 class="page-title mb-2">新增工程數學題目</h1>
+        <div class="text-secondary">考試名稱由網址 exam_id 鎖定，送出時寫入 questions.exam_id。</div>
+      </div>
+      <div class="d-flex flex-wrap align-items-start gap-2">
+        <span class="badge rounded-pill badge-table px-3 py-2">questions</span>
+        <span class="badge rounded-pill badge-table px-3 py-2">choices</span>
+        <span class="badge rounded-pill badge-table px-3 py-2">subquestions</span>
+        <span class="badge rounded-pill badge-table px-3 py-2">subchoices</span>
+        <span class="badge rounded-pill badge-table px-3 py-2">attachments</span>
+      </div>
+    </div>
+
+    <form id="questionForm" class="row g-4" novalidate>
+      <div class="col-12 col-xl-7">
+        <section class="section-panel p-3 p-md-4 mb-4">
+          <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+            <h2 class="section-title mb-0">主題目資料</h2>
+            <span class="text-secondary small">寫入 questions</span>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <label for="questionNumber" class="form-label" id="questionNumberLabel">題號 <span class="required-mark">*</span></label>
+              <input type="text" class="form-control" id="questionNumber" required placeholder="例：2">
+            </div>
+
+            <div class="col-12 col-md-8">
+              <label for="examDisplay" class="form-label">考試名稱 <span class="required-mark">*</span></label>
+              <input type="text" class="form-control locked-field" id="examDisplay" readonly>
+              <input type="hidden" id="examId">
+              <div class="form-text">此欄位由網址 exam_id 載入，不可在新增題目時更改。</div>
+            </div>
+
+            <div class="col-12">
+              <label for="questionText" class="form-label">題目主文</label>
+              <textarea class="form-control" id="questionText" rows="8" placeholder="可輸入 LaTeX，例如：$$\\int_0^1 x^2 dx$$"></textarea>
+              <div class="form-text">沒有子題時，題目主文或圖片至少需要一項；有子題時可只填題組敘述。</div>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label for="questionType" class="form-label">問題類型 <span class="required-mark">*</span></label>
+              <select class="form-select" id="questionType" required>
+                <option value="">請選擇</option>
+                <option value="true_false">是非題</option>
+                <option value="single_choice">單選題</option>
+                <option value="multiple_choice">多選題</option>
+                <option value="short_answer">簡答題</option>
+                <option value="calculation">計算題</option>
+                <option value="proof">證明題</option>
+                <option value="question_group">題組</option>
+                <option value="other">其他</option>
+              </select>
+            </div>
+
+            <div class="col-6 col-md-3">
+              <label for="score" class="form-label">配分</label>
+              <input type="number" class="form-control" id="score" min="0" step="0.5">
+            </div>
+
+            <div class="col-6 col-md-3">
+              <label for="difficulty" class="form-label">難度</label>
+              <select class="form-select" id="difficulty">
+                <option value="">未設定</option>
+                <option value="easy">簡單</option>
+                <option value="medium">中等</option>
+                <option value="hard">困難</option>
+                <option value="advanced">進階</option>
+              </select>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label for="source" class="form-label">來源</label>
+              <input type="text" class="form-control" id="source">
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label for="questionImage" class="form-label">主題目圖片</label>
+              <input type="file" class="form-control" id="questionImage" accept="image/png,image/jpeg,image/webp">
+              <div class="form-text">僅允許 jpg、png、webp，大小不超過 1MB。</div>
+            </div>
+
+            <div class="col-12">
+              <label for="note" class="form-label">備註</label>
+              <textarea class="form-control" id="note" rows="3"></textarea>
+            </div>
+          </div>
+        </section>
+
+        <section id="choicesSection" class="section-panel p-3 p-md-4 mb-4 d-none">
+          <div class="d-flex flex-column flex-sm-row justify-content-between gap-3 mb-3">
+            <div>
+              <h2 class="section-title mb-1">主題目選項</h2>
+              <div class="text-secondary small">單選題或多選題時寫入 choices，預設 A-E，可刪到只剩 A、B。</div>
+            </div>
+            <button class="btn btn-outline-success btn-sm align-self-sm-start" type="button" id="addChoiceBtn">新增選項</button>
+          </div>
+          <div id="choicesList" class="vstack gap-3"></div>
+        </section>
+
+        <section class="section-panel p-3 p-md-4 mb-4">
+          <div class="d-flex flex-column flex-sm-row justify-content-between gap-3 mb-3">
+            <div>
+              <h2 class="section-title mb-1">子題目</h2>
+              <div class="text-secondary small">題組可新增多筆子題；子題可有自己的單選/多選選項。</div>
+            </div>
+            <button class="btn btn-success btn-sm align-self-sm-start" type="button" id="addSubquestionBtn">新增子題</button>
+          </div>
+          <div id="subquestionsList" class="vstack gap-3"></div>
+          <div id="subquestionEmpty" class="text-secondary border rounded-3 p-3 bg-light">目前沒有子題。</div>
+        </section>
+
+        <section class="section-panel p-3 p-md-4 mb-4">
+          <h2 class="section-title mb-3">送出檢查</h2>
+          <div id="submitIssues" class="vstack gap-2 hint-text"></div>
+        </section>
+
+        <section class="section-panel p-3 p-md-4">
+          <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+            <h2 class="section-title mb-0">送出資料預覽</h2>
+            <button class="btn btn-primary" type="submit">送出</button>
+          </div>
+          <div id="submitStatus" class="submit-status mb-3"></div>
+          <pre id="payloadPreview" class="payload-box p-3 mb-0"></pre>
+        </section>
+      </div>
+
+      <aside class="col-12 col-xl-5">
+        <div class="position-sticky sticky-preview">
+          <section class="section-panel p-3 p-md-4">
+            <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+              <h2 class="section-title mb-0">LaTeX 預覽</h2>
+              <div class="d-flex align-items-center gap-2">
+                <input class="form-range preview-resizer" type="range" id="previewHeightSlider" min="18" max="48" value="28" aria-label="預覽高度">
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="refreshPreviewBtn">重新渲染</button>
+              </div>
+            </div>
+
+            <div class="preview-area p-3 p-md-4" id="previewArea">
+              <div class="preview-meta mb-3" id="previewMeta">尚未輸入題目。</div>
+              <article id="mathPreview"></article>
+            </div>
+          </section>
+        </div>
+      </aside>
+    </form>
+  </main>
+
+  <template id="choiceTemplate">
+    <div class="input-group choice-row">
+      <span class="input-group-text choice-letter"></span>
+      <textarea class="form-control choice-input" rows="2" placeholder="可輸入文字或 LaTeX"></textarea>
+      <button class="btn btn-outline-danger remove-choice-btn" type="button">移除</button>
+    </div>
+  </template>
+
+  <template id="subquestionTemplate">
+    <div class="subquestion-item p-3">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3 mb-3">
+        <div>
+          <h3 class="section-title mb-1">子題</h3>
+          <div class="hint-text">子題寫入 subquestions；選項寫入 subchoices。</div>
+        </div>
+        <button class="btn btn-outline-danger btn-sm align-self-md-start remove-subquestion-btn" type="button">移除子題</button>
+      </div>
+      <div class="row g-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label">子題號 <span class="required-mark">*</span></label>
+          <input type="text" class="form-control subquestion-number" placeholder="例：(a)">
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">配分</label>
+          <input type="number" class="form-control subquestion-score" min="0" step="0.5">
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">問題類型 <span class="required-mark">*</span></label>
+          <select class="form-select subquestion-type">
+            <option value="">請選擇</option>
+            <option value="true_false">是非題</option>
+            <option value="single_choice">單選題</option>
+            <option value="multiple_choice">多選題</option>
+            <option value="short_answer">簡答題</option>
+            <option value="calculation">計算題</option>
+            <option value="proof">證明題</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">子題目主文</label>
+          <textarea class="form-control subquestion-text" rows="4" placeholder="可輸入 LaTeX"></textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label">子題目圖片</label>
+          <input type="file" class="form-control subquestion-image" accept="image/png,image/jpeg,image/webp">
+          <div class="form-text">僅允許 jpg、png、webp，大小不超過 1MB。</div>
+        </div>
+      </div>
+      <div class="subchoices-section mt-3 d-none">
+        <div class="d-flex flex-column flex-sm-row justify-content-between gap-2 mb-3">
+          <div>
+            <h4 class="section-title mb-1">子題選項</h4>
+            <div class="hint-text">最少保留 A、B。</div>
+          </div>
+          <button class="btn btn-outline-success btn-sm align-self-sm-start add-subchoice-btn" type="button">新增選項</button>
+        </div>
+        <div class="subchoices-list vstack gap-3"></div>
+      </div>
+    </div>
+  </template>
+
+  <template id="subchoiceTemplate">
+    <div class="input-group subchoice-row">
+      <span class="input-group-text choice-letter"></span>
+      <textarea class="form-control subchoice-input" rows="2" placeholder="可輸入文字或 LaTeX"></textarea>
+      <button class="btn btn-outline-danger remove-subchoice-btn" type="button">移除</button>
+    </div>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/prototype/staged-status.js"></script>
+  <script>
+    const choiceLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    const initialChoiceCount = 5;
+    const minimumChoiceCount = 2;
+    const maxImageSize = 1024 * 1024;
+    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const params = new URLSearchParams(window.location.search);
+    const routeExamId = Number(params.get('exam_id') || 0);
+    const isStandaloneMode = params.get('standalone') === '1' || !params.has('exam_id');
+
+    const form = document.querySelector('#questionForm');
+    const choicesSection = document.querySelector('#choicesSection');
+    const choicesList = document.querySelector('#choicesList');
+    const subquestionsList = document.querySelector('#subquestionsList');
+    const subquestionEmpty = document.querySelector('#subquestionEmpty');
+    const payloadPreview = document.querySelector('#payloadPreview');
+    const mathPreview = document.querySelector('#mathPreview');
+    const previewMeta = document.querySelector('#previewMeta');
+    const submitIssues = document.querySelector('#submitIssues');
+    const submitStatus = document.querySelector('#submitStatus');
+
+    let choiceCount = 0;
+    let subquestionCounter = 0;
+
+    function fieldValue(selector) {
+      return document.querySelector(selector).value.trim();
+    }
+
+    function numberOrNull(value) {
+      const trimmed = String(value).trim();
+      return trimmed === '' ? null : Number(trimmed);
+    }
+
+    function usesChoices() {
+      return ['single_choice', 'multiple_choice'].includes(fieldValue('#questionType'));
+    }
+
+    function usesSubchoices(item) {
+      return ['single_choice', 'multiple_choice'].includes(item.querySelector('.subquestion-type').value.trim());
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;')
+        .replaceAll('\n', '<br>');
+    }
+
+    function examTitle(exam) {
+      return exam.title || '';
+    }
+
+    function setSubmitStatus(type, message) {
+      submitStatus.innerHTML = message
+        ? `<div class="alert alert-${type} py-2 px-3 mb-0">${escapeHtml(message)}</div>`
+        : '';
+    }
+
+    async function loadExam() {
+      if (isStandaloneMode) {
+        document.querySelector('.page-title').textContent = '新增獨立題目';
+        document.querySelector('#questionNumber').required = false;
+        document.querySelector('#questionNumberLabel').textContent = '題號';
+        document.querySelector('#examId').value = '';
+        document.querySelector('#examDisplay').value = '獨立題目，不隸屬任何考試';
+        setSubmitStatus('', '');
+        refreshAll();
+        return;
+      }
+
+      if (!routeExamId) {
+        setSubmitStatus('danger', '網址缺少 exam_id，無法新增題目。');
+        return;
+      }
+      document.querySelector('#examId').value = routeExamId;
+      const status = createStagedStatus({
+        setMessage: (stage) => setSubmitStatus(stage.type, stage.message),
+        stages: loadingStages('考試資料')
+      });
+      status.start();
+      try {
+        const response = await fetch(`/api/admin/exams/${routeExamId}`, { cache: 'no-store' });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || '載入考試失敗');
+        document.querySelector('#examDisplay').value = examTitle(result.data) || `exams.id = ${routeExamId}`;
+        setSubmitStatus('', '');
+        refreshAll();
+      } catch (error) {
+        setSubmitStatus('danger', error.message || '無法載入考試資料');
+      } finally {
+        status.stop();
+      }
+    }
+
+    function addChoice(value = '') {
+      if (choiceCount >= choiceLetters.length) return;
+      const row = document.querySelector('#choiceTemplate').content.firstElementChild.cloneNode(true);
+      const letter = choiceLetters[choiceCount];
+      row.dataset.letter = letter;
+      row.querySelector('.choice-letter').textContent = letter;
+      row.querySelector('.choice-input').value = value;
+      row.querySelector('.remove-choice-btn').disabled = choiceCount < minimumChoiceCount;
+      row.querySelector('.remove-choice-btn').addEventListener('click', () => {
+        row.remove();
+        syncChoiceLetters();
+        refreshAll();
+      });
+      choicesList.appendChild(row);
+      choiceCount += 1;
+      refreshAll();
+    }
+
+    function syncChoiceLetters() {
+      const rows = [...choicesList.querySelectorAll('.choice-row')];
+      rows.forEach((row, index) => {
+        const letter = choiceLetters[index];
+        row.dataset.letter = letter;
+        row.querySelector('.choice-letter').textContent = letter;
+        row.querySelector('.remove-choice-btn').disabled = index < minimumChoiceCount;
+      });
+      choiceCount = rows.length;
+    }
+
+    function ensureDefaultChoices() {
+      if (choicesList.children.length === 0) {
+        for (let index = 0; index < initialChoiceCount; index += 1) addChoice();
+      }
+    }
+
+    function addSubquestion() {
+      const item = document.querySelector('#subquestionTemplate').content.firstElementChild.cloneNode(true);
+      subquestionCounter += 1;
+      item.dataset.clientKey = `subq-${subquestionCounter}`;
+      item.dataset.subchoiceCount = '0';
+      item.querySelector('.remove-subquestion-btn').addEventListener('click', () => {
+        item.remove();
+        refreshAll();
+      });
+      item.querySelector('.subquestion-type').addEventListener('change', () => {
+        if (usesSubchoices(item)) ensureDefaultSubchoices(item);
+        refreshAll();
+      });
+      item.querySelector('.add-subchoice-btn').addEventListener('click', () => addSubchoice(item));
+      subquestionsList.appendChild(item);
+      refreshAll();
+    }
+
+    function addSubchoice(subquestionItem, value = '') {
+      const currentCount = Number(subquestionItem.dataset.subchoiceCount || 0);
+      if (currentCount >= choiceLetters.length) return;
+      const row = document.querySelector('#subchoiceTemplate').content.firstElementChild.cloneNode(true);
+      const letter = choiceLetters[currentCount];
+      row.dataset.letter = letter;
+      row.querySelector('.choice-letter').textContent = letter;
+      row.querySelector('.subchoice-input').value = value;
+      row.querySelector('.remove-subchoice-btn').disabled = currentCount < minimumChoiceCount;
+      row.querySelector('.remove-subchoice-btn').addEventListener('click', () => {
+        row.remove();
+        syncSubchoiceLetters(subquestionItem);
+        refreshAll();
+      });
+      subquestionItem.querySelector('.subchoices-list').appendChild(row);
+      subquestionItem.dataset.subchoiceCount = String(currentCount + 1);
+      refreshAll();
+    }
+
+    function syncSubchoiceLetters(subquestionItem) {
+      const rows = [...subquestionItem.querySelectorAll('.subchoice-row')];
+      rows.forEach((row, index) => {
+        row.dataset.letter = choiceLetters[index];
+        row.querySelector('.choice-letter').textContent = choiceLetters[index];
+        row.querySelector('.remove-subchoice-btn').disabled = index < minimumChoiceCount;
+      });
+      subquestionItem.dataset.subchoiceCount = String(rows.length);
+    }
+
+    function ensureDefaultSubchoices(subquestionItem) {
+      if (subquestionItem.querySelectorAll('.subchoice-row').length === 0) {
+        for (let index = 0; index < initialChoiceCount; index += 1) addSubchoice(subquestionItem);
+      }
+    }
+
+    function buildPayload() {
+      const payload = {
+        questions: {
+          id: null,
+          question_number: fieldValue('#questionNumber'),
+          question_text: fieldValue('#questionText') || null,
+          exam_id: numberOrNull(fieldValue('#examId')),
+          score: numberOrNull(fieldValue('#score')),
+          question_type: fieldValue('#questionType'),
+          difficulty: fieldValue('#difficulty') || null,
+          source: fieldValue('#source') || null,
+          note: fieldValue('#note') || null
+        }
+      };
+
+      if (usesChoices()) {
+        const choices = { A: null, B: null, C: null, D: null, E: null, F: null, G: null, H: null };
+        [...choicesList.querySelectorAll('.choice-row')].forEach((row) => {
+          choices[row.dataset.letter] = row.querySelector('.choice-input').value.trim() || null;
+        });
+        payload.choices = choices;
+      }
+
+      const subquestions = [];
+      const subchoices = [];
+      [...subquestionsList.querySelectorAll('.subquestion-item')].forEach((item) => {
+        const subquestion = {
+          id: null,
+          subquestion_number: item.querySelector('.subquestion-number').value.trim(),
+          subquestion_text: item.querySelector('.subquestion-text').value.trim() || null,
+          main_question: null,
+          score: numberOrNull(item.querySelector('.subquestion-score').value),
+          question_type: item.querySelector('.subquestion-type').value.trim(),
+          _client_key: item.dataset.clientKey
+        };
+        subquestions.push(subquestion);
+
+        if (usesSubchoices(item)) {
+          const record = {
+            A: null, B: null, C: null, D: null, E: null, F: null, G: null, H: null,
+            _parent_subquestion_client_key: item.dataset.clientKey
+          };
+          [...item.querySelectorAll('.subchoice-row')].forEach((row) => {
+            record[row.dataset.letter] = row.querySelector('.subchoice-input').value.trim() || null;
+          });
+          subchoices.push(record);
+        }
+      });
+      if (subquestions.length > 0) payload.subquestions = subquestions;
+      if (subchoices.length > 0) payload.subchoices = subchoices;
+      return payload;
+    }
+
+    function imageErrors() {
+      const errors = [];
+      const files = [
+        ['主題目圖片', document.querySelector('#questionImage').files[0]],
+        ...[...subquestionsList.querySelectorAll('.subquestion-item')].map((item, index) => [`第 ${index + 1} 個子題圖片`, item.querySelector('.subquestion-image').files[0]])
+      ];
+      files.forEach(([label, file]) => {
+        if (!file) return;
+        if (!allowedImageTypes.includes(file.type)) errors.push(`${label} 僅允許 jpg、png、webp`);
+        if (file.size > maxImageSize) errors.push(`${label} 不可超過 1MB`);
+      });
+      return errors;
+    }
+
+    function validationErrors() {
+      const errors = [];
+      const subItems = [...subquestionsList.querySelectorAll('.subquestion-item')];
+      if (!isStandaloneMode && !fieldValue('#questionNumber')) errors.push('題號必填');
+      if (!fieldValue('#questionType')) errors.push('問題類型必填');
+      if (!fieldValue('#questionText') && !document.querySelector('#questionImage').files[0] && subItems.length === 0) {
+        errors.push('沒有子題時，題目主文或主題目圖片至少需要一項');
+      }
+      if (usesChoices() && [...choicesList.querySelectorAll('.choice-input')].filter((input) => input.value.trim()).length < 2) {
+        errors.push('選擇題至少需要填寫 A、B 兩個選項');
+      }
+      subItems.forEach((item, index) => {
+        const label = `第 ${index + 1} 個子題`;
+        if (!item.querySelector('.subquestion-number').value.trim()) errors.push(`${label} 子題號必填`);
+        if (!item.querySelector('.subquestion-type').value.trim()) errors.push(`${label} 問題類型必填`);
+        if (!item.querySelector('.subquestion-text').value.trim() && !item.querySelector('.subquestion-image').files[0]) errors.push(`${label} 主文或圖片至少需要一項`);
+        if (usesSubchoices(item) && [...item.querySelectorAll('.subchoice-input')].filter((input) => input.value.trim()).length < 2) errors.push(`${label} 選擇題至少需要填寫 A、B 兩個選項`);
+      });
+      return [...errors, ...imageErrors()];
+    }
+
+    function refreshIssues() {
+      const errors = validationErrors();
+      const notes = [
+        '後端會用同一個 transaction 依序寫入 questions、choices、subquestions、subchoices、attachments。',
+        '圖片限制 1MB，且只允許 jpg、png、webp。選項不能上傳圖片。'
+      ];
+      submitIssues.innerHTML = [
+        ...errors.map((text) => `<div class="alert alert-danger py-2 px-3 mb-0">${escapeHtml(text)}</div>`),
+        ...notes.map((text) => `<div class="alert alert-info py-2 px-3 mb-0">${escapeHtml(text)}</div>`)
+      ].join('');
+    }
+
+    function refreshPayload() {
+      payloadPreview.textContent = JSON.stringify(buildPayload(), null, 2);
+    }
+
+    async function refreshMathPreview() {
+      const parts = [];
+      previewMeta.textContent = fieldValue('#questionNumber') ? `題號 ${fieldValue('#questionNumber')}` : '尚未輸入題號';
+      parts.push(fieldValue('#questionText') ? escapeHtml(fieldValue('#questionText')) : '<span class="text-secondary">尚未輸入題目主文。</span>');
+      const questionImage = document.querySelector('#questionImage').files[0];
+      if (questionImage) parts.push(`<div class="mt-3"><img class="question-image-preview" src="${URL.createObjectURL(questionImage)}" alt="主題目圖片預覽"></div>`);
+      if (usesChoices()) {
+        parts.push('<hr><ol type="A" class="mb-0">');
+        [...choicesList.querySelectorAll('.choice-row')].forEach((row) => {
+          const value = row.querySelector('.choice-input').value.trim();
+          parts.push(`<li class="mb-2">${value ? escapeHtml(value) : '<span class="text-secondary">未填寫</span>'}</li>`);
+        });
+        parts.push('</ol>');
+      }
+      const subItems = [...subquestionsList.querySelectorAll('.subquestion-item')];
+      if (subItems.length > 0) {
+        parts.push('<hr><div class="vstack gap-3">');
+        subItems.forEach((item) => {
+          const number = item.querySelector('.subquestion-number').value.trim() || '子題';
+          const text = item.querySelector('.subquestion-text').value.trim();
+          const image = item.querySelector('.subquestion-image').files[0];
+          parts.push(`<section><strong>${escapeHtml(number)}</strong><div class="mt-1">${text ? escapeHtml(text) : '<span class="text-secondary">未填寫子題目。</span>'}</div>`);
+          if (image) parts.push(`<div class="mt-3"><img class="question-image-preview" src="${URL.createObjectURL(image)}" alt="子題圖片預覽"></div>`);
+          if (usesSubchoices(item)) {
+            parts.push('<ol type="A" class="mt-2 mb-0">');
+            [...item.querySelectorAll('.subchoice-row')].forEach((row) => {
+              const value = row.querySelector('.subchoice-input').value.trim();
+              parts.push(`<li class="mb-2">${value ? escapeHtml(value) : '<span class="text-secondary">未填寫</span>'}</li>`);
+            });
+            parts.push('</ol>');
+          }
+          parts.push('</section>');
+        });
+        parts.push('</div>');
+      }
+      mathPreview.innerHTML = parts.join('');
+      if (window.MathJax?.typesetPromise) await MathJax.typesetPromise([mathPreview]);
+    }
+
+    function refreshSections() {
+      choicesSection.classList.toggle('d-none', !usesChoices());
+      if (usesChoices()) ensureDefaultChoices();
+      subquestionEmpty.classList.toggle('d-none', subquestionsList.children.length > 0);
+      document.querySelector('#addChoiceBtn').disabled = choiceCount >= choiceLetters.length;
+      [...subquestionsList.querySelectorAll('.subquestion-item')].forEach((item) => {
+        const show = usesSubchoices(item);
+        item.querySelector('.subchoices-section').classList.toggle('d-none', !show);
+        if (show) ensureDefaultSubchoices(item);
+        item.querySelector('.add-subchoice-btn').disabled = Number(item.dataset.subchoiceCount || 0) >= choiceLetters.length;
+      });
+    }
+
+    function refreshAll() {
+      refreshSections();
+      refreshIssues();
+      refreshPayload();
+      refreshMathPreview();
+    }
+
+    async function submitQuestion() {
+      const errors = validationErrors();
+      if (errors.length > 0) {
+        setSubmitStatus('danger', '請先補齊必填欄位，並確認圖片格式與大小。');
+        refreshIssues();
+        return;
+      }
+      const formData = new FormData();
+      formData.append('payload', JSON.stringify(buildPayload()));
+      const questionImage = document.querySelector('#questionImage').files[0];
+      if (questionImage) formData.append('question_image', questionImage);
+      [...subquestionsList.querySelectorAll('.subquestion-item')].forEach((item) => {
+        const file = item.querySelector('.subquestion-image').files[0];
+        if (file) formData.append(`subquestion_image__${item.dataset.clientKey}`, file);
+      });
+
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 120000);
+      const status = createStagedStatus({
+        setMessage: (stage) => setSubmitStatus(stage.type, stage.message),
+        stages: writingStages('寫入題目資料')
+      });
+      status.start();
+      try {
+        const response = await fetch('/api/admin/questions', {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          const detail = Array.isArray(result.errors) ? result.errors.join('；') : result.message;
+          throw new Error(detail || '寫入失敗');
+        }
+        setSubmitStatus('success', '新增成功，正在返回題目列表...');
+        window.setTimeout(() => {
+          window.location.href = result.data?.redirect_to || (isStandaloneMode ? '/prototype/independent-questions.html' : `/prototype/exam-questions.html?exam_id=${fieldValue('#examId')}`);
+        }, 600);
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          setSubmitStatus('warning', '等待後端回應逾時。資料可能仍已寫入，請先回題目列表確認後再決定是否重送。');
+        } else {
+          setSubmitStatus('danger', error.message || '寫入失敗，請稍後再試。');
+        }
+      } finally {
+        status.stop();
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    document.querySelector('#addChoiceBtn').addEventListener('click', () => addChoice());
+    document.querySelector('#addSubquestionBtn').addEventListener('click', addSubquestion);
+    document.querySelector('#refreshPreviewBtn').addEventListener('click', refreshMathPreview);
+    document.querySelector('#previewHeightSlider').addEventListener('input', (event) => {
+      document.querySelector('#previewArea').style.height = `${event.target.value}rem`;
+    });
+    document.querySelector('#previewArea').style.height = `${document.querySelector('#previewHeightSlider').value}rem`;
+    document.querySelector('#backBtn').addEventListener('click', () => {
+      window.location.href = isStandaloneMode ? '/prototype/independent-questions.html' : `/prototype/exam-questions.html?exam_id=${routeExamId || ''}`;
+    });
+    form.addEventListener('input', refreshAll);
+    form.addEventListener('change', refreshAll);
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      form.classList.add('was-validated');
+      await submitQuestion();
+    });
+
+    loadExam();
+    refreshAll();
+  </script>
+</body>
+</html>

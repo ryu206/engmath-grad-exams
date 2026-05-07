@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>新增試題解答</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root {
+      --page-bg: #f7f8fb;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #d9dee8;
+      --panel: #ffffff;
+      --warning-soft: #fff7e6;
+    }
+
+    body {
+      background: var(--page-bg);
+      color: var(--ink);
+      letter-spacing: 0;
+    }
+
+    .app-shell {
+      max-width: 1320px;
+    }
+
+    .page-title {
+      font-size: clamp(1.45rem, 2vw, 2rem);
+      font-weight: 700;
+    }
+
+    .section-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .form-label {
+      font-weight: 600;
+      color: #344054;
+    }
+
+    .required-mark {
+      color: #b42318;
+    }
+
+    .hint-text,
+    .preview-meta {
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .preview-area {
+      min-height: 18rem;
+      max-height: 72vh;
+      background: #fbfcff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: auto;
+      overflow-wrap: anywhere;
+      scrollbar-gutter: stable;
+    }
+
+    .preview-resizer {
+      width: min(11rem, 34vw);
+    }
+
+    .answer-image-preview,
+    .question-image-preview {
+      display: block;
+      max-width: 100%;
+      max-height: 320px;
+      object-fit: contain;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .payload-box {
+      min-height: 14rem;
+      max-height: 28rem;
+      overflow: auto;
+      background: #111827;
+      color: #d1e7dd;
+      border-radius: 8px;
+      font-size: .85rem;
+      white-space: pre-wrap;
+    }
+
+    .badge-table {
+      background: var(--warning-soft);
+      color: #7a4b00;
+      border: 1px solid #f7d48b;
+    }
+
+    .submit-status {
+      min-height: 2.75rem;
+    }
+
+    .sticky-preview {
+      top: 1rem;
+    }
+
+    @media (max-width: 991.98px) {
+      .sticky-preview {
+        position: static !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="container-fluid app-shell py-4 py-lg-5">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+      <div>
+        <button class="btn btn-outline-secondary btn-sm mb-3" id="backToQuestionLink" type="button">回題目列表</button>
+        <h1 class="page-title mb-2">新增試題解答</h1>
+        <div class="text-secondary">一個主題目 questions.id 對應一筆 active answer，不處理子題解答。</div>
+      </div>
+      <div class="d-flex flex-wrap gap-2 align-items-start">
+        <span class="badge rounded-pill badge-table px-3 py-2">answers</span>
+        <span class="badge rounded-pill badge-table px-3 py-2">attachments</span>
+      </div>
+    </div>
+
+    <form id="answerForm" class="row g-4" novalidate>
+      <div class="col-12 col-xl-7">
+        <section class="section-panel p-3 p-md-4 mb-4">
+          <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-3">
+            <div>
+              <h2 class="section-title mb-1">對應題目</h2>
+              <div class="hint-text">question_id 會寫入 answers.question_id</div>
+            </div>
+            <div class="badge text-bg-light border align-self-md-start px-3 py-2">questions.id = <span id="questionIdText"></span></div>
+          </div>
+          <div id="questionPreview" class="border rounded-3 p-3 bg-light">正在載入題目...</div>
+        </section>
+
+        <section class="section-panel p-3 p-md-4 mb-4">
+          <h2 class="section-title mb-3">解答資料</h2>
+
+          <div class="row g-3">
+            <div class="col-12">
+              <label for="shortAnswer" class="form-label">簡答</label>
+              <textarea class="form-control" id="shortAnswer" rows="3" placeholder="可輸入簡短答案或 LaTeX"></textarea>
+            </div>
+
+            <div class="col-12">
+              <label for="answerImage" class="form-label">解答圖片</label>
+              <input type="file" class="form-control" id="answerImage" accept="image/png,image/jpeg,image/webp">
+              <div class="form-text">圖片會顯示在解答敘述之前；僅接受 jpg、png、webp，單張不可超過 1MB。</div>
+            </div>
+
+            <div class="col-12">
+              <label for="answerText" class="form-label">解答 <span class="required-mark">*</span></label>
+              <textarea class="form-control" id="answerText" rows="9" placeholder="可輸入詳細解答與 LaTeX" required></textarea>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label for="source" class="form-label">來源</label>
+              <input type="text" class="form-control" id="source">
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label for="note" class="form-label">備註</label>
+              <input type="text" class="form-control" id="note">
+            </div>
+          </div>
+        </section>
+
+        <section class="section-panel p-3 p-md-4 mb-4">
+          <h2 class="section-title mb-3">送出檢查</h2>
+          <div id="submitIssues" class="vstack gap-2 hint-text"></div>
+        </section>
+
+        <section class="section-panel p-3 p-md-4">
+          <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+            <h2 class="section-title mb-0">送出資料預覽</h2>
+            <button class="btn btn-primary" type="submit" id="submitBtn">送出</button>
+          </div>
+          <div id="submitStatus" class="submit-status mb-3"></div>
+          <pre id="payloadPreview" class="payload-box p-3 mb-0"></pre>
+        </section>
+      </div>
+
+      <aside class="col-12 col-xl-5">
+        <div class="position-sticky sticky-preview">
+          <section class="section-panel p-3 p-md-4">
+            <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+              <h2 class="section-title mb-0">解答預覽</h2>
+              <div class="d-flex align-items-center gap-2">
+                <input class="form-range preview-resizer" type="range" id="previewHeightSlider" min="18" max="48" value="28" aria-label="預覽高度">
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="refreshPreviewBtn">重新渲染</button>
+              </div>
+            </div>
+            <div class="preview-area p-3 p-md-4" id="previewArea">
+              <div class="preview-meta mb-3" id="previewMeta"></div>
+              <article id="answerPreview"></article>
+            </div>
+          </section>
+        </div>
+      </aside>
+    </form>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/prototype/staged-status.js"></script>
+  <script>
+    const maxImageSize = 1024 * 1024;
+    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const requestTimeoutMs = 120000;
+    const params = new URLSearchParams(window.location.search);
+    const questionId = Number(params.get('question_id') || params.get('id') || 0);
+
+    const form = document.querySelector('#answerForm');
+    const answerPreview = document.querySelector('#answerPreview');
+    const previewMeta = document.querySelector('#previewMeta');
+    const payloadPreview = document.querySelector('#payloadPreview');
+    const submitIssues = document.querySelector('#submitIssues');
+    const submitStatus = document.querySelector('#submitStatus');
+    const submitBtn = document.querySelector('#submitBtn');
+
+    let question = null;
+
+    function value(selector) {
+      return document.querySelector(selector).value.trim();
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;')
+        .replaceAll('\n', '<br>');
+    }
+
+    function attachmentUrl(attachment) {
+      if (!attachment) return '';
+      return attachment.url || `/${attachment.path}`;
+    }
+
+    function setSubmitStatus(type, message) {
+      submitStatus.innerHTML = message
+        ? `<div class="alert alert-${type} py-2 px-3 mb-0">${escapeHtml(message)}</div>`
+        : '';
+    }
+
+    function buildPayload() {
+      return {
+        answers: {
+          short_answer: value('#shortAnswer') || null,
+          answer_text: value('#answerText'),
+          question_id: questionId,
+          source: value('#source') || null,
+          note: value('#note') || null
+        }
+      };
+    }
+
+    function imageErrors() {
+      const errors = [];
+      const image = document.querySelector('#answerImage').files[0];
+      if (!image) return errors;
+      if (!allowedImageTypes.includes(image.type)) errors.push('解答圖片只接受 jpg、png、webp。');
+      if (image.size > maxImageSize) errors.push('解答圖片不可超過 1MB。');
+      return errors;
+    }
+
+    function validationErrors() {
+      const errors = [];
+      if (!questionId) errors.push('網址缺少 question_id。');
+      if (!question) errors.push('題目尚未載入完成。');
+      if (!value('#answerText')) errors.push('解答必填。');
+      return [...errors, ...imageErrors()];
+    }
+
+    function refreshQuestionPreview() {
+      document.querySelector('#questionIdText').textContent = questionId || '';
+      if (!question) return;
+
+      const image = question.image || question.attachments?.[0] || null;
+      document.querySelector('#questionPreview').innerHTML = `
+        <div class="fw-bold mb-2">題號 ${escapeHtml(question.question_number)}</div>
+        <div>${question.question_text ? escapeHtml(question.question_text) : '<span class="text-secondary">尚未輸入題目主文。</span>'}</div>
+        ${image ? `<img class="question-image-preview mt-3" src="${attachmentUrl(image)}" alt="${escapeHtml(image.original_filename)}">` : ''}
+      `;
+    }
+
+    function refreshIssues() {
+      const errors = validationErrors();
+      const notes = [
+        '送出後會先確認 questions.id 存在，且同一題尚未有 active answer。',
+        '圖片會先等 answers.id 建立後再存入 uploads/answers，並寫入 attachments。'
+      ];
+      submitIssues.innerHTML = [
+        ...errors.map((text) => `<div class="alert alert-danger py-2 px-3 mb-0">${escapeHtml(text)}</div>`),
+        ...notes.map((text) => `<div class="alert alert-info py-2 px-3 mb-0">${escapeHtml(text)}</div>`)
+      ].join('');
+    }
+
+    function refreshPayload() {
+      const payload = buildPayload();
+      const image = document.querySelector('#answerImage').files[0];
+      if (image) {
+        payload.attachments = [{
+          owner_type: 'answer',
+          owner_id: null,
+          usage_type: 'answer_explanation',
+          original_filename: image.name,
+          mime_type: image.type,
+          file_size: image.size
+        }];
+      }
+      payloadPreview.textContent = JSON.stringify(payload, null, 2);
+    }
+
+    async function refreshAnswerPreview() {
+      const image = document.querySelector('#answerImage').files[0];
+      const shortAnswer = value('#shortAnswer');
+      const answerText = value('#answerText');
+      const parts = [];
+
+      previewMeta.textContent = questionId ? `questions.id = ${questionId}` : '尚未指定題目';
+      if (shortAnswer) {
+        parts.push(`<section class="mb-3"><div class="fw-bold mb-1">簡答</div><div>${escapeHtml(shortAnswer)}</div></section>`);
+      }
+      if (image) {
+        parts.push(`<div class="mb-3"><img class="answer-image-preview" src="${URL.createObjectURL(image)}" alt="解答圖片預覽"></div>`);
+      }
+      parts.push(`<section><div class="fw-bold mb-1">解答</div><div>${answerText ? escapeHtml(answerText) : '<span class="text-secondary">尚未輸入解答。</span>'}</div></section>`);
+      answerPreview.innerHTML = parts.join('');
+
+      if (window.MathJax?.typesetPromise) {
+        await MathJax.typesetPromise([answerPreview, document.querySelector('#questionPreview')]);
+      }
+    }
+
+    function refreshAll() {
+      refreshQuestionPreview();
+      refreshIssues();
+      refreshPayload();
+      refreshAnswerPreview();
+    }
+
+    async function fetchWithTimeout(url, options = {}, timeoutMs = requestTimeoutMs) {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, { ...options, signal: controller.signal });
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    async function loadQuestion() {
+      if (!questionId) {
+        setSubmitStatus('danger', '網址缺少 question_id，無法新增解答。');
+        refreshAll();
+        return;
+      }
+
+      const status = createStagedStatus({
+        setMessage: (stage) => setSubmitStatus(stage.type, stage.message),
+        stages: loadingStages('題目資料')
+      });
+      status.start();
+      try {
+        const response = await fetchWithTimeout(`/api/admin/questions/${questionId}`, { cache: 'no-store' });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || '載入題目失敗。');
+        question = result.data.question;
+        setSubmitStatus('', '');
+        refreshAll();
+      } catch (error) {
+        const message = error.name === 'AbortError'
+          ? '載入逾時，請確認資料庫或本機伺服器狀態後再試一次。'
+          : (error.message || '載入題目失敗。');
+        setSubmitStatus('danger', message);
+      } finally {
+        status.stop();
+      }
+    }
+
+    async function submitAnswer() {
+      const errors = validationErrors();
+      if (errors.length > 0) {
+        setSubmitStatus('danger', '請先處理必填欄位或圖片限制。');
+        refreshIssues();
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('payload', JSON.stringify(buildPayload()));
+      const image = document.querySelector('#answerImage').files[0];
+      if (image) formData.append('answer_image', image);
+
+      submitBtn.disabled = true;
+      const status = createStagedStatus({
+        setMessage: (stage) => setSubmitStatus(stage.type, stage.message),
+        stages: writingStages('寫入解答')
+      });
+      status.start();
+      try {
+        const response = await fetchWithTimeout('/api/admin/answers', {
+          method: 'POST',
+          body: formData
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          const detail = Array.isArray(result.errors) ? result.errors.join('；') : result.message;
+          throw new Error(detail || '新增解答失敗。');
+        }
+        alert('已成功新增解答');
+        window.location.href = result.data?.redirect_to || `/prototype/edit-answer.html?question_id=${questionId}`;
+      } catch (error) {
+        const message = error.name === 'AbortError'
+          ? '寫入逾時，請確認資料庫狀態後再試一次。'
+          : (error.message || '新增解答失敗。');
+        setSubmitStatus('danger', message);
+      } finally {
+        status.stop();
+        submitBtn.disabled = false;
+      }
+    }
+
+    form.addEventListener('input', refreshAll);
+    form.addEventListener('change', refreshAll);
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      form.classList.add('was-validated');
+      await submitAnswer();
+    });
+    document.querySelector('#refreshPreviewBtn').addEventListener('click', refreshAnswerPreview);
+    document.querySelector('#previewHeightSlider').addEventListener('input', (event) => {
+      document.querySelector('#previewArea').style.height = `${event.target.value}rem`;
+    });
+    document.querySelector('#previewArea').style.height = `${document.querySelector('#previewHeightSlider').value}rem`;
+    document.querySelector('#backToQuestionLink').addEventListener('click', () => {
+      if (question?.exam_id) {
+        window.location.href = `/prototype/exam-questions.html?exam_id=${question.exam_id}`;
+      } else if (document.referrer) {
+        history.back();
+      } else {
+        window.location.href = '/prototype/exams-list.html';
+      }
+    });
+
+    loadQuestion();
+    refreshAll();
+  </script>
+</body>
+</html>
