@@ -28,6 +28,7 @@ web/public/uploads/**
 !web/public/uploads/
 !web/public/uploads/.gitkeep
 web/public/assets/generated/
+local-notes/
 
 # local database and backups
 *.sqlite
