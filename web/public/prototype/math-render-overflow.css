@@ -1,0 +1,59 @@
+/* Keep long KaTeX formulas readable on narrow screens without widening the page. */
+.katex {
+  max-width: 100%;
+}
+
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 5px;
+}
+
+.katex-display > .katex {
+  max-width: none;
+}
+
+.content-text,
+#mathPreview,
+#answerPreview,
+#questionPreview,
+.question-item,
+.subquestion-item,
+.section-panel,
+.choice-list,
+.choice-list li,
+.subchoices-list,
+.subchoice-row {
+  min-width: 0;
+}
+
+.choice-list li {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.choice-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: .6rem;
+  width: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+.choice-option input {
+  margin-top: .25rem;
+  accent-color: var(--accent, #0f6b5f);
+}
+
+.choice-option-text {
+  min-width: 0;
+}
+
+.choice-list li:has(input:checked) {
+  border-color: var(--accent, #0f6b5f);
+  background: var(--accent-soft, #e8f4f1);
+}

@@ -1,4 +1,4 @@
-import { getConnection } from '@/lib/db';
+import { databaseErrorMessage, getConnection } from '@/lib/db';
 import { ATTACHMENT_OWNER_TYPES } from '@/server/attachments/attachmentConstants';
 
 export const runtime = 'nodejs';
@@ -21,14 +21,16 @@ export async function GET(_request, { params }) {
     return Response.json({ success: false, message: 'Invalid exam id' }, { status: 400 });
   }
 
-  const connection = await getConnection();
+  let connection;
   let timedOut = false;
-  const timeoutId = setTimeout(() => {
+  let timeoutId;
+
+  try {
+    connection = await getConnection();
+    timeoutId = setTimeout(() => {
     timedOut = true;
     connection.destroy();
   }, DB_OPERATION_TIMEOUT_MS);
-
-  try {
     const [examRows] = await connection.execute(
       `SELECT id, source_kind, title, roc_year, university, department, division, subject, paper
        FROM exams
@@ -159,10 +161,11 @@ export async function GET(_request, { params }) {
     }
 
     console.error('Failed to fetch exam questions:', error);
-    return Response.json({ success: false, message: 'Failed to fetch exam questions' }, { status: 500 });
+    const message = databaseErrorMessage(error) || 'Failed to fetch exam questions';
+    return Response.json({ success: false, message }, { status: 500 });
   } finally {
     clearTimeout(timeoutId);
-    if (!timedOut) {
+    if (connection && !timedOut) {
       connection.release();
     }
   }

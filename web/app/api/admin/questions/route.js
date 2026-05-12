@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { getConnection } from '@/lib/db';
+import { databaseErrorMessage, getConnection } from '@/lib/db';
 import {
   assertAttachmentOwnerType,
   assertAttachmentUsageType,
@@ -165,14 +165,16 @@ function parseFiles(formData) {
 
 export async function POST(request) {
   const uploadedPaths = [];
-  const connection = await getConnection();
+  let connection;
   let timedOut = false;
-  const timeoutId = setTimeout(() => {
+  let timeoutId;
+
+  try {
+    connection = await getConnection();
+    timeoutId = setTimeout(() => {
     timedOut = true;
     connection.destroy();
   }, DB_OPERATION_TIMEOUT_MS);
-
-  try {
     const formData = await request.formData();
     const payload = JSON.parse(String(formData.get('payload') || '{}'));
     const files = parseFiles(formData);
@@ -268,7 +270,7 @@ export async function POST(request) {
       { status: 201 },
     );
   } catch (error) {
-    if (!timedOut) {
+    if (connection && !timedOut) {
       await connection.rollback().catch(() => {});
     }
     for (const uploadedPath of uploadedPaths) {
@@ -280,10 +282,11 @@ export async function POST(request) {
     }
 
     console.error('Failed to create question:', error);
-    return Response.json({ success: false, message: 'Failed to create question' }, { status: 500 });
+    const message = databaseErrorMessage(error) || 'Failed to create question';
+    return Response.json({ success: false, message }, { status: 500 });
   } finally {
     clearTimeout(timeoutId);
-    if (!timedOut) {
+    if (connection && !timedOut) {
       connection.release();
     }
   }

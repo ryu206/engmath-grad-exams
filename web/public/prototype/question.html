@@ -5,16 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>查看題目資料</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script>
-    window.MathJax = {
-      tex: {
-        inlineMath: [['$', '$'], ['\\(', '\\)']],
-        displayMath: [['$$', '$$'], ['\\[', '\\]']]
-      },
-      svg: { fontCache: 'global' }
-    };
-  </script>
-  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link href="/prototype/math-render-overflow.css" rel="stylesheet">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
   <style>
     :root {
       --page-bg: #f7f8fb;
@@ -50,16 +44,22 @@
     }
 
     .question-number {
-      width: 3.25rem;
+      width: fit-content;
       min-width: 3.25rem;
+      max-width: 100%;
       min-height: 3.25rem;
-      display: grid;
-      place-items: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      padding: .65rem .85rem;
       border-radius: 8px;
       background: var(--accent-soft);
       color: var(--accent);
       font-weight: 800;
-      overflow-wrap: anywhere;
+      line-height: 1.15;
+      overflow-wrap: normal;
+      white-space: nowrap;
       text-align: center;
     }
 
@@ -180,11 +180,24 @@
       `).join('');
     }
 
-    function renderChoices(record) {
+    function choiceInputType(questionType) {
+      if (questionType === 'single_choice') return 'radio';
+      if (questionType === 'multiple_choice') return 'checkbox';
+      return '';
+    }
+
+    function renderChoices(record, owner = {}) {
       if (!record) return '';
+      const inputType = choiceInputType(owner.questionType);
+      const inputName = `choice-${owner.kind || 'question'}-${owner.id || Math.random().toString(36).slice(2)}`;
       const items = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
         .filter((letter) => record[letter])
-        .map((letter) => `<li><strong>${letter}.</strong> ${escapeHtml(record[letter])}</li>`)
+        .map((letter) => {
+          const text = `<span class="choice-option-text"><strong>${letter}.</strong> ${escapeHtml(record[letter])}</span>`;
+          return inputType
+            ? `<li><label class="choice-option"><input type="${inputType}" name="${inputName}" value="${letter}">${text}</label></li>`
+            : `<li>${text}</li>`;
+        })
         .join('');
       return items ? `<ol class="choice-list vstack gap-2 mt-3">${items}</ol>` : '';
     }
@@ -203,7 +216,7 @@
                 </div>
                 <div class="content-text">${sub.subquestion_text ? escapeHtml(sub.subquestion_text) : '<span class="text-secondary">尚未輸入子題主文。</span>'}</div>
                 ${renderImages(sub.attachments)}
-                ${renderChoices(sub.subchoices)}
+                ${renderChoices(sub.subchoices, { kind: 'subquestion', id: sub.id, questionType: sub.question_type })}
               </article>
             `).join('')}
           </div>
@@ -246,6 +259,24 @@
       `;
     }
 
+    function renderMath(container) {
+      if (!container) return;
+      if (typeof window.renderMathInElement !== 'function') {
+        if (document.readyState === 'loading') window.addEventListener('load', () => renderMath(container), { once: true });
+        return;
+      }
+      window.renderMathInElement(container, {
+        throwOnError: false,
+        errorCallback: () => {},
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '\\[', right: '\\]', display: true },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '$', right: '$', display: false }
+        ]
+      });
+    }
+
     function renderPage() {
       const question = loadedQuestion;
       const answer = loadedAnswer;
@@ -269,7 +300,7 @@
               </div>
               <div class="content-text">${question.question_text ? escapeHtml(question.question_text) : '<span class="text-secondary">尚未輸入題目主文。</span>'}</div>
               ${renderImages(question.attachments)}
-              ${renderChoices(question.choices)}
+              ${renderChoices(question.choices, { kind: 'question', id: question.id, questionType: question.question_type })}
               ${question.note ? `<div class="meta-text mt-3">備註：${escapeHtml(question.note)}</div>` : ''}
             </div>
           </div>
@@ -278,7 +309,7 @@
         ${renderAnswer(answer)}
       `;
 
-      if (window.MathJax?.typesetPromise) MathJax.typesetPromise([content]);
+      renderMath(content);
     }
 
     async function fetchWithTimeout(url, options = {}, timeoutMs = 120000) {
@@ -289,6 +320,16 @@
       } finally {
         window.clearTimeout(timeoutId);
       }
+    }
+
+    async function readJsonResponse(response, fallbackMessage) {
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) return response.json();
+      await response.text().catch(() => '');
+      return {
+        success: false,
+        message: `${fallbackMessage}（HTTP ${response.status}，伺服器回傳非 JSON 內容）`
+      };
     }
 
     async function loadQuestionPage() {
@@ -304,15 +345,11 @@
       status.start();
 
       try {
-        const questionResponse = await fetchWithTimeout(`/api/admin/questions/${questionId}`);
-        const questionResult = await questionResponse.json();
+        const questionResponse = await fetchWithTimeout(`/api/questions?id=${questionId}`);
+        const questionResult = await readJsonResponse(questionResponse, '載入題目失敗。');
         if (!questionResponse.ok || !questionResult.success) throw new Error(questionResult.message || '載入題目失敗。');
         loadedQuestion = questionResult.data.question;
-
-        const answerResponse = await fetchWithTimeout(`/api/admin/questions/${questionId}/answer`);
-        const answerResult = await answerResponse.json();
-        loadedAnswer = answerResponse.status === 404 ? null : answerResult.data?.answer || null;
-        if (!answerResponse.ok && answerResponse.status !== 404) throw new Error(answerResult.message || '載入解答失敗。');
+        loadedAnswer = questionResult.data.answer || null;
 
         setStatus('', '');
         renderPage();

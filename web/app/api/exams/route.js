@@ -1,4 +1,4 @@
-import { getConnection } from '@/lib/db';
+import { databaseErrorMessage, getConnection } from '@/lib/db';
 
 export const runtime = 'nodejs';
 
@@ -42,14 +42,16 @@ export async function GET(request) {
 
   const whereSql = where.join(' AND ');
   const orderBy = orderByFor(sort);
-  const connection = await getConnection();
+  let connection;
   let timedOut = false;
-  const timeoutId = setTimeout(() => {
+  let timeoutId;
+
+  try {
+    connection = await getConnection();
+    timeoutId = setTimeout(() => {
     timedOut = true;
     connection.destroy();
   }, DB_OPERATION_TIMEOUT_MS);
-
-  try {
     const [countRows] = await connection.execute(
       `SELECT COUNT(*) AS total FROM exams WHERE ${whereSql}`,
       params,
@@ -98,16 +100,17 @@ export async function GET(request) {
     }
 
     console.error('Failed to fetch exams:', error);
+    const message = databaseErrorMessage(error) || 'Failed to fetch exams';
     return Response.json(
       {
         success: false,
-        message: 'Failed to fetch exams',
+        message,
       },
       { status: 500 },
     );
   } finally {
     clearTimeout(timeoutId);
-    if (!timedOut) {
+    if (connection && !timedOut) {
       connection.release();
     }
   }

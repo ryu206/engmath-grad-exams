@@ -5,16 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>編輯工程數學題目</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script>
-    window.MathJax = {
-      tex: {
-        inlineMath: [['$', '$'], ['\\(', '\\)']],
-        displayMath: [['$$', '$$'], ['\\[', '\\]']]
-      },
-      svg: { fontCache: 'global' }
-    };
-  </script>
-  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link href="/prototype/math-render-overflow.css" rel="stylesheet">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
   <style>
     :root {
       --page-bg: #f7f8fb;
@@ -741,6 +735,24 @@
       payloadPreview.textContent = JSON.stringify(buildPayload(), null, 2);
     }
 
+    function renderMath(container) {
+      if (!container) return;
+      if (typeof window.renderMathInElement !== 'function') {
+        if (document.readyState === 'loading') window.addEventListener('load', () => renderMath(container), { once: true });
+        return;
+      }
+      window.renderMathInElement(container, {
+        throwOnError: false,
+        errorCallback: () => {},
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '\\[', right: '\\]', display: true },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '$', right: '$', display: false }
+        ]
+      });
+    }
+
     async function refreshMathPreview() {
       const parts = [];
       previewMeta.textContent = fieldValue('#questionNumber') ? `題號 ${fieldValue('#questionNumber')}` : '尚未輸入題號';
@@ -791,7 +803,7 @@
       }
 
       mathPreview.innerHTML = parts.join('');
-      if (window.MathJax?.typesetPromise) await MathJax.typesetPromise([mathPreview]);
+      renderMath(mathPreview);
     }
 
     function refreshSections() {
@@ -827,6 +839,16 @@
       } finally {
         window.clearTimeout(timeoutId);
       }
+    }
+
+    async function readJsonResponse(response, fallbackMessage) {
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) return response.json();
+      await response.text().catch(() => '');
+      return {
+        success: false,
+        message: `${fallbackMessage}（HTTP ${response.status}，伺服器回傳非 JSON 內容）`
+      };
     }
 
     function examTitle(exam) {
@@ -875,7 +897,7 @@
       status.start();
       try {
         const response = await fetchWithTimeout(`/api/admin/questions/${routeQuestionId}`, { cache: 'no-store' });
-        const result = await response.json();
+        const result = await readJsonResponse(response, '載入題目失敗。');
         if (!response.ok || !result.success) throw new Error(result.message || '載入題目失敗。');
         populateQuestion(result.data);
         setSubmitStatus('', '');
@@ -916,7 +938,7 @@
           method: 'PATCH',
           body: formData
         });
-        const result = await response.json();
+        const result = await readJsonResponse(response, '儲存修改失敗。');
         if (!response.ok || !result.success) {
           const detail = Array.isArray(result.errors) ? result.errors.join('；') : result.message;
           throw new Error(detail || '儲存修改失敗。');
@@ -944,7 +966,7 @@
       status.start();
       try {
         const response = await fetchWithTimeout(`/api/admin/questions/${state.questionId}`, { method: 'DELETE' });
-        const result = await response.json();
+        const result = await readJsonResponse(response, '刪除題目失敗。');
         if (!response.ok || !result.success) throw new Error(result.message || '刪除題目失敗。');
         alert('已刪除成功');
         window.location.href = state.examId || fieldValue('#examId')
