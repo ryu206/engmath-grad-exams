@@ -14,6 +14,58 @@
   max-width: none;
 }
 
+.math-rendering {
+  position: relative;
+  min-height: 3rem;
+  color: transparent;
+}
+
+.math-rendering::before {
+  content: attr(data-math-rendering-label);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  max-width: min(100%, 14rem);
+  padding: .4rem .7rem .4rem 2rem;
+  color: #52616f;
+  background: rgba(255, 255, 255, .88);
+  border: 1px solid rgba(82, 97, 111, .18);
+  border-radius: .5rem;
+  font-size: .85rem;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.math-rendering::after {
+  content: "";
+  position: absolute;
+  top: 1rem;
+  left: .7rem;
+  z-index: 2;
+  width: .9rem;
+  height: .9rem;
+  margin-top: -.45rem;
+  border: 2px solid rgba(15, 107, 95, .22);
+  border-top-color: var(--accent, #0f6b5f);
+  border-radius: 50%;
+  animation: math-render-spin 700ms linear infinite;
+}
+
+.math-render-ready {
+  opacity: 1;
+  transition: opacity 120ms ease;
+}
+
+@keyframes math-render-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .content-text,
 #mathPreview,
 #answerPreview,
@@ -56,4 +108,12 @@
 .choice-list li:has(input:checked) {
   border-color: var(--accent, #0f6b5f);
   background: var(--accent-soft, #e8f4f1);
+}
+
+.renderer-toggle {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 1080;
+  box-shadow: 0 0.5rem 1.5rem rgba(23, 32, 51, 0.12);
 }
