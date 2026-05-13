@@ -144,6 +144,12 @@
       return exam.title || '';
     }
 
+    function examSourceLink(exam) {
+      if (!exam.source) return '';
+      const source = escapeHtml(exam.source);
+      return `<div class="hint-text mt-1">來源：<a href="${source}" target="_blank" rel="noopener noreferrer">${source}</a></div>`;
+    }
+
     function pageButton(label, page, disabled = false, active = false) {
       return `
         <li class="page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}">
@@ -203,6 +209,7 @@
               <div>
                 <a class="exam-link fs-5" href="exam-questions.html?exam_id=${exam.id}">${escapeHtml(title)}</a>
                 <div class="hint-text mt-1">exams.id = ${exam.id}</div>
+                ${examSourceLink(exam)}
               </div>
               <div class="d-flex flex-wrap gap-2 align-self-md-start">
                 <a class="btn btn-outline-secondary btn-sm" href="/prototype/edit-exams.html?id=${exam.id}">編輯</a>

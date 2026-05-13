@@ -146,27 +146,35 @@
       return attachment.url || `/${attachment.path}`;
     }
 
-    function choiceInputType(questionType) {
-      if (questionType === 'single_choice') return 'radio';
-      if (questionType === 'multiple_choice') return 'checkbox';
+    function choiceMode(questionType) {
+      if (questionType === 'single_choice') return 'single';
+      if (questionType === 'multiple_choice') return 'multiple';
       return '';
     }
 
     function renderChoices(record, className = 'mt-3', owner = {}) {
       if (!record) return '';
-      const inputType = choiceInputType(owner.questionType);
+      const mode = choiceMode(owner.questionType);
       const inputName = `choice-${owner.kind || 'question'}-${owner.id || Math.random().toString(36).slice(2)}`;
       const items = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
         .filter((letter) => record[letter])
         .map((letter) => {
           const text = `<span class="choice-option-text"><strong>${letter}.</strong> ${escapeHtml(record[letter])}</span>`;
-          return inputType
-            ? `<li><label class="choice-option"><input type="${inputType}" name="${inputName}" value="${letter}">${text}</label></li>`
+          return mode
+            ? `<li><label class="choice-option"><input type="checkbox" name="${inputName}" value="${letter}" data-choice-mode="${mode}">${text}</label></li>`
             : `<li>${text}</li>`;
         })
         .join('');
       return items ? `<ol class="choice-list vstack gap-2 ${className}">${items}</ol>` : '';
     }
+
+    questionList.addEventListener('change', (event) => {
+      const input = event.target.closest('input[data-choice-mode="single"]');
+      if (!input || !input.checked) return;
+      input.closest('.choice-list')?.querySelectorAll('input[data-choice-mode="single"]').forEach((item) => {
+        if (item !== input) item.checked = false;
+      });
+    });
 
     function renderAttachments(attachments) {
       return (attachments || []).map((attachment) => `

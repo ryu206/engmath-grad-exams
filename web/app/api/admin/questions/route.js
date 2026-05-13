@@ -18,6 +18,7 @@ const ALLOWED_IMAGE_TYPES = new Map([
   ['image/png', 'png'],
   ['image/webp', 'webp'],
 ]);
+const CHOICE_KEYS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 function emptyToNull(value) {
   if (value === undefined || value === null) return null;
@@ -37,7 +38,47 @@ function usesChoices(type) {
 }
 
 function countChoiceValues(record) {
-  return ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].filter((key) => emptyToNull(record?.[key]) !== null).length;
+  return CHOICE_KEYS.filter((key) => emptyToNull(record?.[key]) !== null).length;
+}
+
+function nodeNumber(record) {
+  return emptyToNull(record?.question_number ?? record?.subquestion_number);
+}
+
+function nodeText(record) {
+  return emptyToNull(record?.question_text ?? record?.subquestion_text);
+}
+
+function normalizeQuestionNodes(payload) {
+  if (Array.isArray(payload.question_nodes)) {
+    return payload.question_nodes.map((node) => ({
+      ...node,
+      q_level: normalizeNodeLevel(node),
+      question_number: node.question_number ?? node.subquestion_number,
+      question_text: node.question_text ?? node.subquestion_text,
+      choices: node.choices || null,
+    }));
+  }
+
+  return (payload.subquestions || []).map((subquestion) => {
+    const subchoice = (payload.subchoices || []).find(
+      (item) => item._parent_subquestion_client_key === subquestion._client_key,
+    );
+    return {
+      ...subquestion,
+      q_level: 2,
+      _parent_client_key: null,
+      question_number: subquestion.subquestion_number,
+      question_text: subquestion.subquestion_text,
+      choices: subchoice || null,
+    };
+  });
+}
+
+function normalizeNodeLevel(node) {
+  const explicitLevel = Number(node?.q_level);
+  if ([2, 3].includes(explicitLevel)) return explicitLevel;
+  return emptyToNull(node?._parent_client_key) === null ? 2 : 3;
 }
 
 function validateImage(file, label) {
@@ -54,38 +95,54 @@ function validateImage(file, label) {
 function validatePayload(payload, files) {
   const errors = [];
   const question = payload.questions || {};
-  const subquestions = payload.subquestions || [];
+  const questionNodes = normalizeQuestionNodes(payload);
   const questionType = emptyToNull(question.question_type);
   const examId = numberOrNull(question.exam_id);
+  const nodeByClientKey = new Map();
 
   if (examId && !emptyToNull(question.question_number)) errors.push('題號必填');
   if (!questionType) errors.push('問題類型必填');
-  if (!emptyToNull(question.question_text) && !files.questionImage && subquestions.length === 0) {
-    errors.push('沒有子題時，題目主文或主題目圖片至少需要一項');
+  if (!emptyToNull(question.question_text) && !files.questionImage && questionNodes.length === 0) {
+    errors.push('沒有下層題目時，題目主文或主題目圖片至少需要一項');
   }
   if (usesChoices(questionType) && countChoiceValues(payload.choices) < 2) {
     errors.push('選擇題至少需填寫 A、B 兩個選項');
   }
 
-  subquestions.forEach((subquestion, index) => {
-    const label = `第 ${index + 1} 個子題`;
-    const subType = emptyToNull(subquestion.question_type);
-    const subImage = files.subquestionImages.get(subquestion._client_key);
-    if (!emptyToNull(subquestion.subquestion_number)) errors.push(`${label} 子題號必填`);
-    if (!subType) errors.push(`${label} 問題類型必填`);
-    if (!emptyToNull(subquestion.subquestion_text) && !subImage) {
-      errors.push(`${label} 子題主文或圖片至少需要一項`);
+  questionNodes.forEach((node, index) => {
+    const label = `第 ${index + 1} 個下層題目`;
+    const nodeType = emptyToNull(node.question_type);
+    const nodeLevel = Number(node.q_level);
+    const nodeImage = files.questionImages.get(node._client_key);
+    if (!node._client_key) errors.push(`${label} 缺少 client key`);
+    if (node._client_key && nodeByClientKey.has(node._client_key)) errors.push(`${label} client key 重複`);
+    if (node._client_key) nodeByClientKey.set(node._client_key, node);
+    if (![2, 3].includes(nodeLevel)) errors.push(`${label} 層級必須為 2 或 3`);
+    if (nodeLevel === 2 && emptyToNull(node._parent_client_key) !== null) errors.push(`${label} 第二層題目的 parent 必須是主題目`);
+    if (nodeLevel === 3 && !emptyToNull(node._parent_client_key)) errors.push(`${label} 第三層題目必須指定第二層 parent`);
+    if (!nodeNumber(node)) errors.push(`${label} 題號必填`);
+    if (!nodeType) errors.push(`${label} 問題類型必填`);
+    if (!nodeText(node) && !nodeImage) {
+      errors.push(`${label} 題目主文或圖片至少需要一項`);
     }
-    if (usesChoices(subType)) {
-      const subchoice = (payload.subchoices || []).find((item) => item._parent_subquestion_client_key === subquestion._client_key);
-      if (countChoiceValues(subchoice) < 2) errors.push(`${label} 選擇題至少需填寫 A、B 兩個選項`);
+    if (usesChoices(nodeType) && countChoiceValues(node.choices) < 2) {
+      errors.push(`${label} 選擇題至少需填寫 A、B 兩個選項`);
     }
   });
 
+  questionNodes
+    .filter((node) => Number(node.q_level) === 3)
+    .forEach((node) => {
+      const parent = nodeByClientKey.get(node._parent_client_key);
+      if (!parent || Number(parent.q_level) !== 2) {
+        errors.push(`第三層題目 ${node._client_key} 的 parent 必須是第二層題目`);
+      }
+    });
+
   const questionImageError = validateImage(files.questionImage, '主題目圖片');
   if (questionImageError) errors.push(questionImageError);
-  for (const [clientKey, file] of files.subquestionImages.entries()) {
-    const imageError = validateImage(file, `子題圖片 ${clientKey}`);
+  for (const [clientKey, file] of files.questionImages.entries()) {
+    const imageError = validateImage(file, `下層題目圖片 ${clientKey}`);
     if (imageError) errors.push(imageError);
   }
 
@@ -151,16 +208,49 @@ async function insertAttachment(connection, ownerType, ownerId, usageType, store
 
 function parseFiles(formData) {
   const questionImage = formData.get('question_image');
-  const subquestionImages = new Map();
+  const questionImages = new Map();
   for (const [key, value] of formData.entries()) {
     if (key.startsWith('subquestion_image__') && value instanceof File && value.size > 0) {
-      subquestionImages.set(key.replace('subquestion_image__', ''), value);
+      questionImages.set(key.replace('subquestion_image__', ''), value);
+    }
+    if (key.startsWith('question_image__') && value instanceof File && value.size > 0) {
+      questionImages.set(key.replace('question_image__', ''), value);
     }
   }
   return {
     questionImage: questionImage instanceof File && questionImage.size > 0 ? questionImage : null,
-    subquestionImages,
+    questionImages,
   };
+}
+
+async function insertChoiceRecord(connection, questionId, choices) {
+  await connection.execute(
+    `INSERT INTO choices (question_id, A, B, C, D, E, F, G, H)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [questionId, ...CHOICE_KEYS.map((key) => emptyToNull(choices?.[key]))],
+  );
+}
+
+async function insertQuestionNode(connection, node, { examId, parentId, qLevel, rootId }) {
+  const [result] = await connection.execute(
+    `INSERT INTO questions (
+      question_number, question_text, exam_id, parent_id, q_level, root_id, score, question_type, difficulty, source, note
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      nodeNumber(node),
+      nodeText(node),
+      examId,
+      parentId,
+      qLevel,
+      rootId,
+      numberOrNull(node.score),
+      emptyToNull(node.question_type),
+      emptyToNull(node.difficulty),
+      emptyToNull(node.source),
+      emptyToNull(node.note),
+    ],
+  );
+  return result.insertId;
 }
 
 export async function POST(request) {
@@ -187,30 +277,23 @@ export async function POST(request) {
     await connection.beginTransaction();
 
     const question = payload.questions;
-    const [questionResult] = await connection.execute(
-      `INSERT INTO questions (
-        question_number, question_text, exam_id, score, question_type, difficulty, source, note
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        emptyToNull(question.question_number),
-        emptyToNull(question.question_text),
-        numberOrNull(question.exam_id),
-        numberOrNull(question.score),
-        emptyToNull(question.question_type),
-        emptyToNull(question.difficulty),
-        emptyToNull(question.source),
-        emptyToNull(question.note),
-      ],
+    const examId = numberOrNull(question.exam_id);
+    const questionId = await insertQuestionNode(connection, question, {
+      examId,
+      parentId: null,
+      qLevel: 1,
+      rootId: null,
+    });
+
+    await connection.execute(
+      `UPDATE questions
+       SET root_id = ?
+       WHERE id = ?`,
+      [questionId, questionId],
     );
-    const questionId = questionResult.insertId;
 
     if (usesChoices(emptyToNull(question.question_type))) {
-      const choices = payload.choices || {};
-      await connection.execute(
-        `INSERT INTO choices (question_id, A, B, C, D, E, F, G, H)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [questionId, ...['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((key) => emptyToNull(choices[key]))],
-      );
+      await insertChoiceRecord(connection, questionId, payload.choices || {});
     }
 
     if (files.questionImage) {
@@ -219,39 +302,31 @@ export async function POST(request) {
       await insertAttachment(connection, ATTACHMENT_OWNER_TYPES.QUESTION, questionId, ATTACHMENT_USAGE_TYPES.QUESTION_PROMPT, stored.record);
     }
 
-    const subquestionIdByClientKey = new Map();
-    for (const subquestion of payload.subquestions || []) {
-      const [subResult] = await connection.execute(
-        `INSERT INTO subquestions (
-          subquestion_number, subquestion_text, main_question, score, question_type
-        ) VALUES (?, ?, ?, ?, ?)`,
-        [
-          emptyToNull(subquestion.subquestion_number),
-          emptyToNull(subquestion.subquestion_text),
-          questionId,
-          numberOrNull(subquestion.score),
-          emptyToNull(subquestion.question_type),
-        ],
-      );
-      const subquestionId = subResult.insertId;
-      subquestionIdByClientKey.set(subquestion._client_key, subquestionId);
+    const nodeIdByClientKey = new Map();
+    const nodes = normalizeQuestionNodes(payload).sort((a, b) => Number(a.q_level) - Number(b.q_level));
+    for (const node of nodes) {
+      const qLevel = Number(node.q_level);
+      const parentId = qLevel === 2 ? questionId : nodeIdByClientKey.get(node._parent_client_key);
+      if (!parentId) throw new Error('Missing parent question id');
 
-      const subImage = files.subquestionImages.get(subquestion._client_key);
-      if (subImage) {
-        const stored = await storeImage(subImage, ATTACHMENT_OWNER_TYPES.SUBQUESTION, subquestionId);
-        uploadedPaths.push(stored.absolutePath);
-        await insertAttachment(connection, ATTACHMENT_OWNER_TYPES.SUBQUESTION, subquestionId, ATTACHMENT_USAGE_TYPES.QUESTION_PROMPT, stored.record);
+      const nodeId = await insertQuestionNode(connection, node, {
+        examId,
+        parentId,
+        qLevel,
+        rootId: questionId,
+      });
+      nodeIdByClientKey.set(node._client_key, nodeId);
+
+      if (usesChoices(emptyToNull(node.question_type))) {
+        await insertChoiceRecord(connection, nodeId, node.choices || {});
       }
-    }
 
-    for (const subchoice of payload.subchoices || []) {
-      const subquestionId = subquestionIdByClientKey.get(subchoice._parent_subquestion_client_key);
-      if (!subquestionId) throw new Error('Missing subquestion id for subchoice');
-      await connection.execute(
-        `INSERT INTO subchoices (subquestion_id, A, B, C, D, E, F, G, H)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [subquestionId, ...['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((key) => emptyToNull(subchoice[key]))],
-      );
+      const nodeImage = files.questionImages.get(node._client_key);
+      if (nodeImage) {
+        const stored = await storeImage(nodeImage, ATTACHMENT_OWNER_TYPES.QUESTION, nodeId);
+        uploadedPaths.push(stored.absolutePath);
+        await insertAttachment(connection, ATTACHMENT_OWNER_TYPES.QUESTION, nodeId, ATTACHMENT_USAGE_TYPES.QUESTION_PROMPT, stored.record);
+      }
     }
 
     await connection.commit();
@@ -262,8 +337,8 @@ export async function POST(request) {
         message: 'Question created',
         data: {
           id: questionId,
-          redirect_to: numberOrNull(question.exam_id)
-            ? `/prototype/exam-questions.html?exam_id=${numberOrNull(question.exam_id)}`
+          redirect_to: examId
+            ? `/prototype/exam-questions.html?exam_id=${examId}`
             : '/prototype/independent-questions.html',
         },
       },

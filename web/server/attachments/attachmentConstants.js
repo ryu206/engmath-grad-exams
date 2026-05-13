@@ -1,6 +1,5 @@
 export const ATTACHMENT_OWNER_TYPES = Object.freeze({
   QUESTION: 'question',
-  SUBQUESTION: 'subquestion',
   ANSWER: 'answer',
 });
 

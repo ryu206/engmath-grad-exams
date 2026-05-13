@@ -4,6 +4,7 @@ import { buildExamTitle, emptyToNull, normalizeSourceKind } from '@/lib/exams';
 export const runtime = 'nodejs';
 
 const DB_OPERATION_TIMEOUT_MS = 55000;
+const MAX_SOURCE_LENGTH = 2048;
 
 function numberOrNull(value) {
   const normalized = emptyToNull(value);
@@ -23,6 +24,7 @@ function validateExam(exam) {
   const rocYear = numberOrNull(exam.roc_year);
   const university = emptyToNull(exam.university);
   const titleInput = emptyToNull(exam.title);
+  const source = emptyToNull(exam.source);
   const paper = emptyToNull(exam.paper);
 
   if (!sourceKind) {
@@ -48,9 +50,14 @@ function validateExam(exam) {
     errors.paper = 'Paper cannot exceed 50 characters';
   }
 
+  if (source !== null && source.length > MAX_SOURCE_LENGTH) {
+    errors.source = `Source cannot exceed ${MAX_SOURCE_LENGTH} characters`;
+  }
+
   const data = {
     source_kind: sourceKind || 'graduate_exam',
     title: null,
+    source,
     roc_year: sourceKind === 'graduate_exam' ? rocYear : null,
     university: sourceKind === 'graduate_exam' ? university : null,
     department: sourceKind === 'graduate_exam' ? emptyToNull(exam.department) : null,
@@ -110,6 +117,7 @@ export async function GET(_request, { params }) {
           id,
           source_kind,
           title,
+          source,
           roc_year,
           university,
           department,
@@ -172,6 +180,7 @@ export async function PATCH(request, { params }) {
           SET
             source_kind = ?,
             title = ?,
+            source = ?,
             roc_year = ?,
             university = ?,
             department = ?,
@@ -183,6 +192,7 @@ export async function PATCH(request, { params }) {
           [
             validation.data.source_kind,
             validation.data.title,
+            validation.data.source,
             validation.data.roc_year,
             validation.data.university,
             validation.data.department,
@@ -207,6 +217,7 @@ export async function PATCH(request, { params }) {
             id,
             source_kind: validation.data.source_kind,
             title: validation.data.title,
+            source: validation.data.source,
             redirect_to: `/prototype/edit-exams.html?id=${id}`,
           },
         });

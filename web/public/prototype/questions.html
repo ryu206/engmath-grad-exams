@@ -144,8 +144,8 @@
       <div class="d-flex flex-wrap align-items-start gap-2">
         <span class="badge rounded-pill badge-table px-3 py-2">questions</span>
         <span class="badge rounded-pill badge-table px-3 py-2">choices</span>
-        <span class="badge rounded-pill badge-table px-3 py-2">subquestions</span>
-        <span class="badge rounded-pill badge-table px-3 py-2">subchoices</span>
+        <span class="badge rounded-pill badge-table px-3 py-2">questions tree</span>
+        <span class="badge rounded-pill badge-table px-3 py-2">choices</span>
         <span class="badge rounded-pill badge-table px-3 py-2">attachments</span>
       </div>
     </div>
@@ -186,6 +186,8 @@
                 <option value="multiple_choice">多選題</option>
                 <option value="short_answer">簡答題</option>
                 <option value="calculation">計算題</option>
+                <option value="analyze">分析</option>
+                <option value="plot">作圖</option>
                 <option value="proof">證明題</option>
                 <option value="question_group">題組</option>
                 <option value="other">其他</option>
@@ -297,10 +299,13 @@
     <div class="subquestion-item p-3">
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3 mb-3">
         <div>
-          <h3 class="section-title mb-1">子題</h3>
-          <div class="hint-text">子題寫入 subquestions；選項寫入 subchoices。</div>
+          <h3 class="section-title mb-1 subquestion-heading">子題</h3>
+          <div class="hint-text">下層題目寫入 questions.parent_id；選項沿用 choices。</div>
         </div>
-        <button class="btn btn-outline-danger btn-sm align-self-md-start remove-subquestion-btn" type="button">移除子題</button>
+        <div class="d-flex flex-wrap gap-2 align-self-md-start">
+          <button class="btn btn-outline-primary btn-sm add-grandchild-btn" type="button">新增孫題</button>
+          <button class="btn btn-outline-danger btn-sm remove-subquestion-btn" type="button">移除</button>
+        </div>
       </div>
       <div class="row g-3">
         <div class="col-12 col-md-4">
@@ -320,6 +325,8 @@
             <option value="multiple_choice">多選題</option>
             <option value="short_answer">簡答題</option>
             <option value="calculation">計算題</option>
+            <option value="analyze">分析</option>
+            <option value="plot">作圖</option>
             <option value="proof">證明題</option>
           </select>
         </div>
@@ -343,6 +350,7 @@
         </div>
         <div class="subchoices-list vstack gap-3"></div>
       </div>
+      <div class="grandchildren-list vstack gap-3 mt-3"></div>
     </div>
   </template>
 
@@ -490,11 +498,20 @@
       }
     }
 
-    function addSubquestion() {
+    function directSubchoiceRows(subquestionItem) {
+      return [...subquestionItem.querySelectorAll(':scope > .subchoices-section .subchoices-list > .subchoice-row')];
+    }
+
+    function addSubquestion(qLevel = 2, parentItem = null) {
       const item = document.querySelector('#subquestionTemplate').content.firstElementChild.cloneNode(true);
       subquestionCounter += 1;
-      item.dataset.clientKey = `subq-${subquestionCounter}`;
+      item.dataset.clientKey = `${qLevel === 2 ? 'subq' : 'subsubq'}-${subquestionCounter}`;
+      item.dataset.qLevel = String(qLevel);
+      item.dataset.parentClientKey = parentItem?.dataset.clientKey || '';
       item.dataset.subchoiceCount = '0';
+      item.querySelector('.subquestion-heading').textContent = qLevel === 2 ? '子題' : '孫題';
+      item.querySelector('.subquestion-number').placeholder = qLevel === 2 ? '例：(a)' : '例：(i)';
+      if (qLevel === 3) item.querySelector('.add-grandchild-btn').classList.add('d-none');
       item.querySelector('.remove-subquestion-btn').addEventListener('click', () => {
         item.remove();
         refreshAll();
@@ -504,7 +521,12 @@
         refreshAll();
       });
       item.querySelector('.add-subchoice-btn').addEventListener('click', () => addSubchoice(item));
-      subquestionsList.appendChild(item);
+      item.querySelector('.add-grandchild-btn').addEventListener('click', () => addSubquestion(3, item));
+      if (parentItem) {
+        parentItem.querySelector(':scope > .grandchildren-list').appendChild(item);
+      } else {
+        subquestionsList.appendChild(item);
+      }
       refreshAll();
     }
 
@@ -528,7 +550,7 @@
     }
 
     function syncSubchoiceLetters(subquestionItem) {
-      const rows = [...subquestionItem.querySelectorAll('.subchoice-row')];
+      const rows = directSubchoiceRows(subquestionItem);
       rows.forEach((row, index) => {
         row.dataset.letter = choiceLetters[index];
         row.querySelector('.choice-letter').textContent = choiceLetters[index];
@@ -538,7 +560,7 @@
     }
 
     function ensureDefaultSubchoices(subquestionItem) {
-      if (subquestionItem.querySelectorAll('.subchoice-row').length === 0) {
+      if (directSubchoiceRows(subquestionItem).length === 0) {
         for (let index = 0; index < initialChoiceCount; index += 1) addSubchoice(subquestionItem);
       }
     }
@@ -566,33 +588,37 @@
         payload.choices = choices;
       }
 
-      const subquestions = [];
-      const subchoices = [];
-      [...subquestionsList.querySelectorAll('.subquestion-item')].forEach((item) => {
-        const subquestion = {
+      const questionNodes = [];
+      function collectQuestionNode(item) {
+        const node = {
           id: null,
-          subquestion_number: item.querySelector('.subquestion-number').value.trim(),
-          subquestion_text: item.querySelector('.subquestion-text').value.trim() || null,
-          main_question: null,
+          q_level: Number(item.dataset.qLevel || 2),
+          parent_id: null,
+          root_id: null,
+          question_number: item.querySelector('.subquestion-number').value.trim(),
+          question_text: item.querySelector('.subquestion-text').value.trim() || null,
           score: numberOrNull(item.querySelector('.subquestion-score').value),
           question_type: item.querySelector('.subquestion-type').value.trim(),
-          _client_key: item.dataset.clientKey
+          difficulty: null,
+          source: null,
+          note: null,
+          _client_key: item.dataset.clientKey,
+          _parent_client_key: item.dataset.parentClientKey || null
         };
-        subquestions.push(subquestion);
 
         if (usesSubchoices(item)) {
-          const record = {
-            A: null, B: null, C: null, D: null, E: null, F: null, G: null, H: null,
-            _parent_subquestion_client_key: item.dataset.clientKey
-          };
-          [...item.querySelectorAll('.subchoice-row')].forEach((row) => {
-            record[row.dataset.letter] = row.querySelector('.subchoice-input').value.trim() || null;
+          node.choices = { A: null, B: null, C: null, D: null, E: null, F: null, G: null, H: null };
+          directSubchoiceRows(item).forEach((row) => {
+            node.choices[row.dataset.letter] = row.querySelector('.subchoice-input').value.trim() || null;
           });
-          subchoices.push(record);
         }
-      });
-      if (subquestions.length > 0) payload.subquestions = subquestions;
-      if (subchoices.length > 0) payload.subchoices = subchoices;
+
+        questionNodes.push(node);
+        [...item.querySelectorAll(':scope > .grandchildren-list > .subquestion-item')].forEach(collectQuestionNode);
+      }
+
+      [...subquestionsList.querySelectorAll(':scope > .subquestion-item')].forEach(collectQuestionNode);
+      if (questionNodes.length > 0) payload.question_nodes = questionNodes;
       return payload;
     }
 
@@ -600,7 +626,7 @@
       const errors = [];
       const files = [
         ['主題目圖片', document.querySelector('#questionImage').files[0]],
-        ...[...subquestionsList.querySelectorAll('.subquestion-item')].map((item, index) => [`第 ${index + 1} 個子題圖片`, item.querySelector('.subquestion-image').files[0]])
+        ...[...subquestionsList.querySelectorAll('.subquestion-item')].map((item, index) => [`第 ${index + 1} 個下層題目圖片`, item.querySelector('.subquestion-image').files[0]])
       ];
       files.forEach(([label, file]) => {
         if (!file) return;
@@ -616,17 +642,17 @@
       if (!isStandaloneMode && !fieldValue('#questionNumber')) errors.push('題號必填');
       if (!fieldValue('#questionType')) errors.push('問題類型必填');
       if (!fieldValue('#questionText') && !document.querySelector('#questionImage').files[0] && subItems.length === 0) {
-        errors.push('沒有子題時，題目主文或主題目圖片至少需要一項');
+        errors.push('沒有下層題目時，題目主文或主題目圖片至少需要一項');
       }
       if (usesChoices() && [...choicesList.querySelectorAll('.choice-input')].filter((input) => input.value.trim()).length < 2) {
         errors.push('選擇題至少需要填寫 A、B 兩個選項');
       }
       subItems.forEach((item, index) => {
-        const label = `第 ${index + 1} 個子題`;
-        if (!item.querySelector('.subquestion-number').value.trim()) errors.push(`${label} 子題號必填`);
+        const label = `第 ${index + 1} 個${Number(item.dataset.qLevel) === 3 ? '孫題' : '子題'}`;
+        if (!item.querySelector('.subquestion-number').value.trim()) errors.push(`${label} 題號必填`);
         if (!item.querySelector('.subquestion-type').value.trim()) errors.push(`${label} 問題類型必填`);
         if (!item.querySelector('.subquestion-text').value.trim() && !item.querySelector('.subquestion-image').files[0]) errors.push(`${label} 主文或圖片至少需要一項`);
-        if (usesSubchoices(item) && [...item.querySelectorAll('.subchoice-input')].filter((input) => input.value.trim()).length < 2) errors.push(`${label} 選擇題至少需要填寫 A、B 兩個選項`);
+        if (usesSubchoices(item) && directSubchoiceRows(item).map((row) => row.querySelector('.subchoice-input')).filter((input) => input.value.trim()).length < 2) errors.push(`${label} 選擇題至少需要填寫 A、B 兩個選項`);
       });
       return [...errors, ...imageErrors()];
     }
@@ -634,7 +660,7 @@
     function refreshIssues() {
       const errors = validationErrors();
       const notes = [
-        '後端會用同一個 transaction 依序寫入 questions、choices、subquestions、subchoices、attachments。',
+        '後端會用同一個 transaction 寫入 questions 自關聯樹、choices 與 attachments。',
         '圖片限制 1MB，且只允許 jpg、png、webp。選項不能上傳圖片。'
       ];
       submitIssues.innerHTML = [
@@ -724,7 +750,7 @@
       if (questionImage) formData.append('question_image', questionImage);
       [...subquestionsList.querySelectorAll('.subquestion-item')].forEach((item) => {
         const file = item.querySelector('.subquestion-image').files[0];
-        if (file) formData.append(`subquestion_image__${item.dataset.clientKey}`, file);
+        if (file) formData.append(`question_image__${item.dataset.clientKey}`, file);
       });
 
       const controller = new AbortController();
@@ -762,7 +788,7 @@
     }
 
     document.querySelector('#addChoiceBtn').addEventListener('click', () => addChoice());
-    document.querySelector('#addSubquestionBtn').addEventListener('click', addSubquestion);
+    document.querySelector('#addSubquestionBtn').addEventListener('click', () => addSubquestion(2));
     document.querySelector('#refreshPreviewBtn').addEventListener('click', () => {
       window.clearTimeout(previewTimer);
       refreshMathPreview();

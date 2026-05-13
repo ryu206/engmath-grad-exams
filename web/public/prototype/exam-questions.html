@@ -151,27 +151,35 @@
       return attachment.url || `/${attachment.path}`;
     }
 
-    function choiceInputType(questionType) {
-      if (questionType === 'single_choice') return 'radio';
-      if (questionType === 'multiple_choice') return 'checkbox';
+    function choiceMode(questionType) {
+      if (questionType === 'single_choice') return 'single';
+      if (questionType === 'multiple_choice') return 'multiple';
       return '';
     }
 
     function renderChoices(record, className = 'mt-3', owner = {}) {
       if (!record) return '';
-      const inputType = choiceInputType(owner.questionType);
+      const mode = choiceMode(owner.questionType);
       const inputName = `choice-${owner.kind || 'question'}-${owner.id || Math.random().toString(36).slice(2)}`;
       const items = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
         .filter((letter) => record[letter])
         .map((letter) => {
           const text = `<span class="choice-option-text"><strong>${letter}.</strong> ${escapeHtml(record[letter])}</span>`;
-          return inputType
-            ? `<li><label class="choice-option"><input type="${inputType}" name="${inputName}" value="${letter}">${text}</label></li>`
+          return mode
+            ? `<li><label class="choice-option"><input type="checkbox" name="${inputName}" value="${letter}" data-choice-mode="${mode}">${text}</label></li>`
             : `<li>${text}</li>`;
         })
         .join('');
       return items ? `<ol class="choice-list vstack gap-2 ${className}">${items}</ol>` : '';
     }
+
+    questionList.addEventListener('change', (event) => {
+      const input = event.target.closest('input[data-choice-mode="single"]');
+      if (!input || !input.checked) return;
+      input.closest('.choice-list')?.querySelectorAll('input[data-choice-mode="single"]').forEach((item) => {
+        if (item !== input) item.checked = false;
+      });
+    });
 
     function renderAttachments(attachments) {
       return (attachments || []).map((attachment) => `
@@ -186,8 +194,24 @@
       return `<a class="btn btn-outline-primary btn-sm" href="/prototype/answers.html?question_id=${question.id}">新增解答</a>`;
     }
 
+    function renderQuestionNode(node) {
+      const children = node.children || node.subquestions || [];
+      const label = Number(node.q_level) === 3 ? '孫題' : '子題';
+      return `
+        <section>
+          <div class="fw-bold">${escapeHtml(node.question_number || node.subquestion_number || `#${node.id}`)}</div>
+          <div>${node.question_text ? escapeHtml(node.question_text) : '<span class="text-secondary">尚未輸入題目主文。</span>'}</div>
+          ${renderAttachments(node.attachments)}
+          ${renderChoices(node.choices || node.subchoices, 'mt-2', { kind: 'question', id: node.id, questionType: node.question_type })}
+          <div class="hint-text mt-1">${label} questions.id = ${node.id} | ${escapeHtml(node.question_type || '未選擇')} | ${node.score ?? ''} 分</div>
+          ${children.length > 0 ? `<div class="subquestion-list vstack gap-3 mt-3 ms-3">${children.map(renderQuestionNode).join('')}</div>` : ''}
+        </section>
+      `;
+    }
+
     function renderQuestion(question) {
       const displayNumber = question.question_number || `#${question.id}`;
+      const children = question.children || question.subquestions || [];
       return `
         <article class="question-item p-3 p-md-4">
           <div class="d-flex flex-column flex-md-row gap-3">
@@ -204,17 +228,9 @@
               <div>${question.question_text ? escapeHtml(question.question_text) : '<span class="text-secondary">尚未輸入題目主文。</span>'}</div>
               ${renderAttachments(question.attachments)}
               ${renderChoices(question.choices, 'mt-3', { kind: 'question', id: question.id, questionType: question.question_type })}
-              ${question.subquestions.length > 0 ? `
+              ${children.length > 0 ? `
                 <div class="subquestion-list vstack gap-3 mt-3">
-                  ${question.subquestions.map((sub) => `
-                    <section>
-                      <div class="fw-bold">${escapeHtml(sub.subquestion_number)}</div>
-                      <div>${sub.subquestion_text ? escapeHtml(sub.subquestion_text) : '<span class="text-secondary">尚未輸入子題主文。</span>'}</div>
-                      ${renderAttachments(sub.attachments)}
-                      ${renderChoices(sub.subchoices, 'mt-2', { kind: 'subquestion', id: sub.id, questionType: sub.question_type })}
-                      <div class="hint-text mt-1">subquestions.id = ${sub.id} | ${escapeHtml(sub.question_type || '未選擇')} | ${sub.score ?? ''} 分</div>
-                    </section>
-                  `).join('')}
+                  ${children.map(renderQuestionNode).join('')}
                 </div>
               ` : ''}
             </div>

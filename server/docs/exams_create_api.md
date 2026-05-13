@@ -30,6 +30,7 @@ POST /api/admin/exams
 {
   "exams": {
     "id": null,
+    "source": "https://example.edu.tw/exams/108.pdf",
     "roc_year": 108,
     "university": "中興",
     "department": "精密",
@@ -41,6 +42,8 @@ POST /api/admin/exams
 ```
 
 `created_at`、`updated_at` 不需要前端送，由 MySQL 自動處理。
+
+`source` 非必填，空字串會存為 `NULL`，最多 2048 字元，適合存放較長的來源網址。
 
 `roc_year` 驗證範圍為 1 到 9999，允許四位數年份。
 

@@ -70,7 +70,9 @@ The shared stylesheet is:
 <link href="/prototype/math-render-overflow.css" rel="stylesheet">
 ```
 
-It keeps long display formulas horizontally scrollable without widening the page.
+It keeps long display formulas horizontally scrollable without widening the page. It also keeps choice list items from widening the page when a choice contains a long formula.
+
+Choice inputs on browsing pages are visually represented by a leading check mark instead of native radio or checkbox controls. The check mark is absolutely positioned, so unselected choices do not reserve blank space before the option text. Single-choice questions still allow at most one selected option in the same choice list, but the selected option can be clicked again to clear it. Multiple-choice questions allow any number of selected options.
 
 ## Rendering State Classes
 

@@ -11,6 +11,7 @@ CREATE TABLE exams (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   source_kind VARCHAR(50) NOT NULL DEFAULT 'graduate_exam',
   title VARCHAR(255) NOT NULL,
+  source VARCHAR(2048) NULL,
   roc_year SMALLINT UNSIGNED NULL,
   university VARCHAR(100) NULL,
   department VARCHAR(100) NULL,
@@ -37,6 +38,9 @@ CREATE TABLE questions (
   question_number VARCHAR(50) NULL,
   question_text LONGTEXT NULL,
   exam_id INT UNSIGNED NULL,
+  parent_id INT UNSIGNED NULL,
+  q_level TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  root_id INT UNSIGNED NULL,
   score DECIMAL(6,2) NULL,
   question_type VARCHAR(50) NULL,
   difficulty VARCHAR(50) NULL,
@@ -50,11 +54,28 @@ CREATE TABLE questions (
   INDEX idx_questions_question_number (question_number),
   INDEX idx_questions_question_type (question_type),
   INDEX idx_questions_deleted_at (deleted_at),
-  INDEX idx_questions_exam_list (exam_id, deleted_at, question_number),
+  INDEX idx_questions_exam_list (exam_id, deleted_at, q_level, question_number),
+  INDEX idx_questions_parent (parent_id, deleted_at, question_number),
+  INDEX idx_questions_root (root_id, deleted_at, q_level, question_number),
   CONSTRAINT fk_questions_exam
     FOREIGN KEY (exam_id) REFERENCES exams (id)
     ON UPDATE CASCADE
-    ON DELETE SET NULL
+    ON DELETE SET NULL,
+  CONSTRAINT fk_questions_parent
+    FOREIGN KEY (parent_id) REFERENCES questions (id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE,
+  CONSTRAINT fk_questions_root
+    FOREIGN KEY (root_id) REFERENCES questions (id)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT,
+  CONSTRAINT chk_questions_q_level
+    CHECK (q_level IN (1, 2, 3)),
+  CONSTRAINT chk_questions_root_shape
+    CHECK (
+      (q_level = 1 AND parent_id IS NULL)
+      OR (q_level IN (2, 3) AND parent_id IS NOT NULL AND root_id IS NOT NULL)
+    )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE choices (
@@ -76,51 +97,6 @@ CREATE TABLE choices (
   INDEX idx_choices_deleted_at (deleted_at),
   CONSTRAINT fk_choices_question
     FOREIGN KEY (question_id) REFERENCES questions (id)
-    ON UPDATE CASCADE
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE subquestions (
-  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  subquestion_number VARCHAR(50) NOT NULL,
-  subquestion_text LONGTEXT NULL,
-  main_question INT UNSIGNED NOT NULL,
-  score DECIMAL(6,2) NULL,
-  question_type VARCHAR(50) NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  deleted_at TIMESTAMP NULL DEFAULT NULL,
-  PRIMARY KEY (id),
-  INDEX idx_subquestions_main_question (main_question),
-  INDEX idx_subquestions_number (subquestion_number),
-  INDEX idx_subquestions_question_type (question_type),
-  INDEX idx_subquestions_deleted_at (deleted_at),
-  INDEX idx_subquestions_question_list (main_question, deleted_at, subquestion_number),
-  CONSTRAINT fk_subquestions_main_question
-    FOREIGN KEY (main_question) REFERENCES questions (id)
-    ON UPDATE CASCADE
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE subchoices (
-  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  subquestion_id INT UNSIGNED NOT NULL,
-  A TEXT NULL,
-  B TEXT NULL,
-  C TEXT NULL,
-  D TEXT NULL,
-  E TEXT NULL,
-  F TEXT NULL,
-  G TEXT NULL,
-  H TEXT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  deleted_at TIMESTAMP NULL DEFAULT NULL,
-  PRIMARY KEY (id),
-  INDEX idx_subchoices_subquestion_id (subquestion_id),
-  INDEX idx_subchoices_deleted_at (deleted_at),
-  CONSTRAINT fk_subchoices_subquestion
-    FOREIGN KEY (subquestion_id) REFERENCES subquestions (id)
     ON UPDATE CASCADE
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -176,7 +152,7 @@ CREATE TABLE attachments (
   INDEX idx_attachments_deleted_at (deleted_at),
   INDEX idx_attachments_checksum (checksum),
   CONSTRAINT chk_attachments_owner_type
-    CHECK (owner_type IN ('question', 'subquestion', 'answer')),
+    CHECK (owner_type IN ('question', 'answer')),
   CONSTRAINT chk_attachments_usage_type
     CHECK (usage_type IN ('question_prompt', 'answer_explanation'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

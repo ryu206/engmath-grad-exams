@@ -52,6 +52,7 @@ Request:
 {
   "exams": {
     "id": 1,
+    "source": "https://example.edu.tw/exams/108.pdf",
     "roc_year": 108,
     "university": "中興",
     "department": "精密",

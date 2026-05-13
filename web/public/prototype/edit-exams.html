@@ -161,6 +161,12 @@
               <label for="paper" class="form-label">卷別</label>
               <input type="text" class="form-control" id="paper">
             </div>
+
+            <div class="col-12">
+              <label for="source" class="form-label">來源網址</label>
+              <input type="url" class="form-control" id="source" maxlength="2048">
+              <div class="form-text">非必填，最多 2048 字元。</div>
+            </div>
           </div>
         </section>
 
@@ -204,6 +210,7 @@
     const subjectPreset = document.querySelector('#subjectPreset');
     const customSubjectBox = document.querySelector('#customSubjectBox');
     const customSubject = document.querySelector('#customSubject');
+    const sourceInput = document.querySelector('#source');
     const payloadPreview = document.querySelector('#payloadPreview');
     const examPreview = document.querySelector('#examPreview');
     const editIssues = document.querySelector('#editIssues');
@@ -254,6 +261,7 @@
           id: examId,
           source_kind: sourceKind.value,
           title: isGraduate ? null : examTitleInput.value.trim(),
+          source: sourceInput.value.trim() || null,
           roc_year: isGraduate ? numberOrNull(value('#rocYear')) : null,
           university: isGraduate ? value('#university') || null : null,
           department: isGraduate ? value('#department') || null : null,
@@ -318,7 +326,7 @@
         : '其他來源的 title 由使用者輸入。';
 
       examPreview.innerHTML = title
-        ? `<h3 class="h5 mb-3">${escapeHtml(title)}</h3><div class="hint-text">${escapeHtml(note)}</div>`
+        ? `<h3 class="h5 mb-3">${escapeHtml(title)}</h3><div class="hint-text mb-2">${escapeHtml(note)}</div>${sourceInput.value.trim() ? `<a class="small" href="${escapeHtml(sourceInput.value.trim())}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceInput.value.trim())}</a>` : ''}`
         : '<span class="text-secondary">請輸入必要欄位後預覽名稱。</span>';
     }
 
@@ -358,6 +366,7 @@
       document.querySelector('#department').value = exam.department ?? '';
       document.querySelector('#division').value = exam.division ?? '';
       document.querySelector('#paper').value = exam.paper ?? '';
+      sourceInput.value = exam.source ?? '';
       customSubject.value = '';
 
       const presetValues = ['工程數學', '應用數學', '線性代數'];

@@ -36,8 +36,8 @@ export async function GET(request) {
   const params = [];
 
   if (keyword !== '') {
-    where.push(`title LIKE ?`);
-    params.push(`%${keyword}%`);
+    where.push(`(title LIKE ? OR source LIKE ?)`);
+    params.push(`%${keyword}%`, `%${keyword}%`);
   }
 
   const whereSql = where.join(' AND ');
@@ -65,6 +65,7 @@ export async function GET(request) {
         id,
         source_kind,
         title,
+        source,
         roc_year,
         university,
         department,

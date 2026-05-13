@@ -178,26 +178,51 @@
       `).join('');
     }
 
-    function choiceInputType(questionType) {
-      if (questionType === 'single_choice') return 'radio';
-      if (questionType === 'multiple_choice') return 'checkbox';
+    function choiceMode(questionType) {
+      if (questionType === 'single_choice') return 'single';
+      if (questionType === 'multiple_choice') return 'multiple';
       return '';
     }
 
     function renderChoices(record, owner = {}) {
       if (!record) return '';
-      const inputType = choiceInputType(owner.questionType);
+      const mode = choiceMode(owner.questionType);
       const inputName = `choice-${owner.kind || 'question'}-${owner.id || Math.random().toString(36).slice(2)}`;
       const items = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
         .filter((letter) => record[letter])
         .map((letter) => {
           const text = `<span class="choice-option-text"><strong>${letter}.</strong> ${escapeHtml(record[letter])}</span>`;
-          return inputType
-            ? `<li><label class="choice-option"><input type="${inputType}" name="${inputName}" value="${letter}">${text}</label></li>`
+          return mode
+            ? `<li><label class="choice-option"><input type="checkbox" name="${inputName}" value="${letter}" data-choice-mode="${mode}">${text}</label></li>`
             : `<li>${text}</li>`;
         })
         .join('');
       return items ? `<ol class="choice-list vstack gap-2 mt-3">${items}</ol>` : '';
+    }
+
+    content.addEventListener('change', (event) => {
+      const input = event.target.closest('input[data-choice-mode="single"]');
+      if (!input || !input.checked) return;
+      input.closest('.choice-list')?.querySelectorAll('input[data-choice-mode="single"]').forEach((item) => {
+        if (item !== input) item.checked = false;
+      });
+    });
+
+    function renderQuestionNode(node) {
+      const children = node.children || node.subquestions || [];
+      const label = Number(node.q_level) === 3 ? '孫題' : '子題';
+      return `
+        <article class="subquestion-item p-3">
+          <div class="d-flex flex-column flex-sm-row justify-content-between gap-2 mb-2">
+            <h3 class="h6 fw-bold mb-0">${escapeHtml(node.question_number || node.subquestion_number || `#${node.id}`)}</h3>
+            <div class="meta-text">${label} questions.id = ${node.id} | ${escapeHtml(node.question_type || '未選擇')} | ${node.score ?? ''} 分</div>
+          </div>
+          <div class="content-text">${node.question_text ? escapeHtml(node.question_text) : '<span class="text-secondary">尚未輸入題目主文。</span>'}</div>
+          ${renderImages(node.attachments)}
+          ${renderChoices(node.choices || node.subchoices, { kind: 'question', id: node.id, questionType: node.question_type })}
+          ${children.length > 0 ? `<div class="vstack gap-3 mt-3 ms-3">${children.map(renderQuestionNode).join('')}</div>` : ''}
+        </article>
+      `;
     }
 
     function renderSubquestions(subquestions) {
@@ -206,17 +231,7 @@
         <section class="section-panel p-3 p-md-4">
           <h2 class="section-title mb-3">子題</h2>
           <div class="vstack gap-3">
-            ${subquestions.map((sub) => `
-              <article class="subquestion-item p-3">
-                <div class="d-flex flex-column flex-sm-row justify-content-between gap-2 mb-2">
-                  <h3 class="h6 fw-bold mb-0">${escapeHtml(sub.subquestion_number)}</h3>
-                  <div class="meta-text">subquestions.id = ${sub.id} | ${escapeHtml(sub.question_type || '未選擇')} | ${sub.score ?? ''} 分</div>
-                </div>
-                <div class="content-text">${sub.subquestion_text ? escapeHtml(sub.subquestion_text) : '<span class="text-secondary">尚未輸入子題主文。</span>'}</div>
-                ${renderImages(sub.attachments)}
-                ${renderChoices(sub.subchoices, { kind: 'subquestion', id: sub.id, questionType: sub.question_type })}
-              </article>
-            `).join('')}
+            ${subquestions.map(renderQuestionNode).join('')}
           </div>
         </section>
       `;
