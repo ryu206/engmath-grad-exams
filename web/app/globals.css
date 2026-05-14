@@ -99,3 +99,105 @@ h2 {
 .inline-link {
   margin-left: 8px;
 }
+
+.math-copy {
+  border-radius: 4px;
+  cursor: pointer;
+  outline: 0;
+  position: relative;
+}
+
+.math-copy:hover,
+.math-copy:focus-visible {
+  background: rgba(15, 107, 95, .1);
+  box-shadow: 0 0 0 2px rgba(15, 107, 95, .18);
+}
+
+.math-copy-display {
+  display: block;
+  margin: .35rem 0;
+  padding: .25rem .5rem;
+}
+
+.math-copy-display:hover,
+.math-copy-display:focus-visible {
+  background: transparent;
+  box-shadow: none;
+  outline: 2px solid rgba(15, 107, 95, .45);
+  outline-offset: 3px;
+}
+
+.math-copy-display:hover::after,
+.math-copy-display:focus-visible::after {
+  content: "LaTeX";
+  position: absolute;
+  top: -.65rem;
+  right: .25rem;
+  z-index: 1;
+  padding: .1rem .4rem;
+  border-radius: 4px;
+  background: #0f6b5f;
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.math-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(23, 32, 51, .45);
+}
+
+.math-modal {
+  width: min(720px, 100%);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 24px 64px rgba(23, 32, 51, .28);
+}
+
+.math-modal-header,
+.math-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+}
+
+.math-modal-header {
+  border-bottom: 1px solid var(--line);
+}
+
+.math-modal-header h2 {
+  margin: 0;
+}
+
+.math-modal-icon-button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.math-modal-source {
+  display: block;
+  width: calc(100% - 32px);
+  margin: 16px;
+  padding: 12px;
+  resize: vertical;
+  white-space: pre;
+  font-family: Consolas, Monaco, monospace;
+}
+
+.math-modal-footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+}

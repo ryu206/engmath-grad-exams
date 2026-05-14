@@ -62,6 +62,40 @@ To change a page default later, update:
 - `/prototype/answers.html`
 - `/prototype/edit-answer.html`
 
+## LaTeX Source Modal
+
+Reading pages can opt in to clickable rendered formulas with:
+
+```html
+<html lang="zh-Hant" data-default-math-renderer="katex" data-math-copy="modal">
+```
+
+The first implementation is enabled only on formal reading pages:
+
+- `/prototype/exam-questions.html`
+- `/prototype/independent-questions.html`
+- `/prototype/question.html`
+
+The shared renderer only wraps these delimiters:
+
+- `\( ... \)`
+- `\[ ... \]`
+- `$$ ... $$`
+
+Single-dollar math is intentionally ignored to avoid false positives in money amounts and ordinary text. The wrapper is created with DOM APIs, and the original LaTeX string is stored in a `WeakMap` instead of an HTML `data-*` attribute. This avoids attribute escaping problems with quotes, backslashes, and multiline formulas.
+
+The parser protects `code`, `pre`, `textarea`, `script`, and `style` blocks before wrapping formulas. Editing and input pages do not opt in, so raw LaTeX input fields and live preview areas remain unchanged in the first version.
+
+For KaTeX, the displayed formula text is normalized before auto-rendering so multiline inline formulas such as:
+
+```tex
+\(
+y^{(4)}-6y''+8y'-3y=0
+\)
+```
+
+render like the single-line form. The modal still shows the original source, and formulas containing HTML `<br>` line breaks are converted back to real newlines in the modal text.
+
 ## Overflow CSS
 
 The shared stylesheet is:

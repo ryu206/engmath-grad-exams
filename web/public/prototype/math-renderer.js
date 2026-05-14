@@ -3,9 +3,14 @@
   const DEFAULT_RENDERER = 'mathjax';
   const FONT_LOAD_TIMEOUT_MS = 1500;
   const containerState = new WeakMap();
+  const latexByElement = new WeakMap();
   const knownContainers = new Set();
+  const supportedMathPattern = /\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$/g;
+  const excludedHtmlPattern = /<(code|pre|textarea|script|style)\b[\s\S]*?<\/\1>/gi;
   let activeRenderer = currentRenderer();
   let loadingPromise = null;
+  let latexModal = null;
+  let mathCopyId = 0;
 
   function currentRenderer() {
     const params = new URLSearchParams(window.location.search);
@@ -125,6 +130,148 @@
     return /\\begin\{(?:matrix|[pbBvV]?matrix|cases|align\*?|aligned|gather\*?|gathered|array)\}/.test(math);
   }
 
+  function mathCopyMode(container) {
+    if (document.documentElement.dataset.mathCopy !== 'modal') return 'off';
+    if (container.closest('[data-math-copy="off"]')) return 'off';
+    return 'modal';
+  }
+
+  function latexSourceFromHtml(latexHtml) {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = latexHtml.replace(/<br\s*\/?>/gi, '\n');
+    return textarea.value;
+  }
+
+  function protectExcludedHtml(sourceHtml) {
+    const blocks = [];
+    const html = sourceHtml.replace(excludedHtmlPattern, (block) => {
+      const index = blocks.push(block) - 1;
+      return `\uE000MATH_COPY_BLOCK_${index}\uE001`;
+    });
+    return { html, blocks };
+  }
+
+  function restoreExcludedHtml(sourceHtml, blocks) {
+    return sourceHtml.replace(/\uE000MATH_COPY_BLOCK_(\d+)\uE001/g, (_match, index) => blocks[Number(index)] || '');
+  }
+
+  function wrapMathCopySourceHtml(sourceHtml, renderer) {
+    const { html: protectedHtml, blocks } = protectExcludedHtml(sourceHtml);
+    const latexById = new Map();
+    supportedMathPattern.lastIndex = 0;
+    const wrappedHtml = protectedHtml.replace(supportedMathPattern, (latexHtml) => {
+      const id = `math-copy-${++mathCopyId}`;
+      const sourceLatex = latexSourceFromHtml(latexHtml);
+      const displayLatexHtml = renderer === 'katex' ? normalizeLatexForKatex(latexHtml) : latexHtml;
+      const displayClass = /^\\\[|\$\$/.test(latexHtml) ? 'math-copy-display' : 'math-copy-inline';
+      latexById.set(id, sourceLatex);
+      return `<span class="math-copy ${displayClass}" data-math-copy-id="${id}" tabindex="0" role="button" aria-label="Open LaTeX source" title="Open LaTeX source">${displayLatexHtml}</span>`;
+    });
+
+    return {
+      html: restoreExcludedHtml(wrappedHtml, blocks),
+      latexById
+    };
+  }
+
+  function bindMathCopyTargets(container, latexById) {
+    container.querySelectorAll('.math-copy[data-math-copy-id]').forEach((element) => {
+      if (element.closest('.choice-option')) {
+        element.classList.remove('math-copy');
+        element.removeAttribute('data-math-copy-id');
+        element.removeAttribute('tabindex');
+        element.removeAttribute('role');
+        element.removeAttribute('aria-label');
+        element.removeAttribute('title');
+        return;
+      }
+
+      const latex = latexById.get(element.dataset.mathCopyId);
+      if (!latex) return;
+      latexByElement.set(element, latex);
+      element.removeAttribute('data-math-copy-id');
+    });
+  }
+
+  function createLatexModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = 'mathLatexModal';
+    modal.tabIndex = -1;
+    modal.setAttribute('aria-labelledby', 'mathLatexModalTitle');
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title fs-5" id="mathLatexModalTitle">LaTeX source</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <textarea class="form-control font-monospace math-latex-source" rows="8" readonly></textarea>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" data-math-copy-latex>Copy</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const textarea = modal.querySelector('.math-latex-source');
+    const copyButton = modal.querySelector('[data-math-copy-latex]');
+    copyButton.addEventListener('click', async () => {
+      textarea.focus();
+      textarea.select();
+      try {
+        await navigator.clipboard.writeText(textarea.value);
+        copyButton.textContent = 'Copied';
+        window.setTimeout(() => {
+          copyButton.textContent = 'Copy';
+        }, 1200);
+      } catch (_error) {
+        document.execCommand('copy');
+      }
+    });
+    modal.addEventListener('click', (event) => {
+      if (event.target.matches('[data-bs-dismiss="modal"]')) hideFallbackLatexModal();
+    });
+
+    return modal;
+  }
+
+  function showLatexModal(latex) {
+    if (!latexModal) latexModal = createLatexModal();
+
+    const textarea = latexModal.querySelector('.math-latex-source');
+    textarea.value = latex;
+
+    if (window.bootstrap?.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(latexModal).show();
+      window.setTimeout(() => textarea.focus(), 150);
+      return;
+    }
+
+    latexModal.classList.add('show');
+    latexModal.style.display = 'block';
+    latexModal.removeAttribute('aria-hidden');
+    textarea.focus();
+  }
+
+  function hideFallbackLatexModal() {
+    if (!latexModal || window.bootstrap?.Modal) return;
+    latexModal.classList.remove('show');
+    latexModal.style.display = 'none';
+    latexModal.setAttribute('aria-hidden', 'true');
+  }
+
+  function openMathCopyTarget(target) {
+    const latex = latexByElement.get(target);
+    if (!latex) return;
+    showLatexModal(latex);
+  }
+
   async function ensureRendererLoaded(renderer) {
     if (renderer === 'katex') {
       await loadStylesheet('katex-css', `https://cdn.jsdelivr.net/npm/katex@${KATEX_VERSION}/dist/katex.min.css`);
@@ -171,8 +318,14 @@
     try {
       await loadingPromise;
 
-      const renderHtml = renderer === 'katex' ? normalizeLatexForKatex(sourceHtml) : sourceHtml;
-      container.innerHTML = renderHtml;
+      if (mathCopyMode(container) === 'modal') {
+        const wrappedSource = wrapMathCopySourceHtml(sourceHtml, renderer);
+        container.innerHTML = wrappedSource.html;
+        bindMathCopyTargets(container, wrappedSource.latexById);
+      } else {
+        const renderHtml = renderer === 'katex' ? normalizeLatexForKatex(sourceHtml) : sourceHtml;
+        container.innerHTML = renderHtml;
+      }
       if (renderer === 'katex' && typeof window.renderMathInElement === 'function') {
         window.renderMathInElement(container, {
           throwOnError: false,
@@ -234,6 +387,25 @@
     document.body.appendChild(button);
   }
 
+  function installMathCopyInteractions() {
+    document.addEventListener('click', (event) => {
+      const target = event.target.closest('.math-copy');
+      if (!target) return;
+      if (target.closest('.choice-option')) return;
+      event.preventDefault();
+      openMathCopyTarget(target);
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const target = event.target.closest('.math-copy');
+      if (!target) return;
+      if (target.closest('.choice-option')) return;
+      event.preventDefault();
+      openMathCopyTarget(target);
+    });
+  }
+
   window.renderMath = (container) => {
     renderContainer(container).catch((error) => {
       console.error('Failed to render math:', error);
@@ -247,8 +419,12 @@
   window.getMathRenderer = () => activeRenderer;
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', installToggle, { once: true });
+    document.addEventListener('DOMContentLoaded', () => {
+      installToggle();
+      installMathCopyInteractions();
+    }, { once: true });
   } else {
     installToggle();
+    installMathCopyInteractions();
   }
 })();

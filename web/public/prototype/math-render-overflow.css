@@ -60,6 +60,54 @@
   transition: opacity 120ms ease;
 }
 
+.math-copy {
+  border-radius: 4px;
+  cursor: pointer;
+  outline: 0;
+  position: relative;
+}
+
+.math-copy:hover,
+.math-copy:focus-visible {
+  background: rgba(15, 107, 95, .1);
+  box-shadow: 0 0 0 2px rgba(15, 107, 95, .18);
+}
+
+.math-copy-display {
+  display: block;
+  margin: .35rem 0;
+  padding: .25rem .5rem;
+}
+
+.math-copy-display:hover,
+.math-copy-display:focus-visible {
+  background: transparent;
+  box-shadow: none;
+  outline: 2px solid rgba(15, 107, 95, .45);
+  outline-offset: 3px;
+}
+
+.math-copy-display:hover::after,
+.math-copy-display:focus-visible::after {
+  content: "LaTeX";
+  position: absolute;
+  top: -.65rem;
+  right: .25rem;
+  z-index: 1;
+  padding: .1rem .4rem;
+  border-radius: 4px;
+  background: #0f6b5f;
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.math-latex-source {
+  white-space: pre;
+}
+
 @keyframes math-render-spin {
   to {
     transform: rotate(360deg);
